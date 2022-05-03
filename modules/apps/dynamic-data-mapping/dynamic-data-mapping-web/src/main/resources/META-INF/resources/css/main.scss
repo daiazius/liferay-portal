@@ -4,6 +4,10 @@
 	display: none;
 }
 
+.form-group.form-inline.input-boolean-wrapper label, .form-group.form-inline.input-checkbox-wrapper label {
+	display: none;
+  }
+
 .portlet-document-library,
 .portlet-dynamic-data-mapping {
 	.field-labels-inline {
