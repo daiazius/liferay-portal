@@ -336,12 +336,11 @@ const Main = ({
 
 	useEffect(() => {
 		setCurrentValue(value);
-		setDisplayErrors(initialDisplayErrors);
 		setErrorMessage(getErrorMessages(initialErrorMessage, isSignedIn));
 		setValid(initialValid);
 
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [initialDisplayErrors, initialErrorMessage, initialValid, value]);
+	}, [initialErrorMessage, initialValid, value]);
 
 	const checkMaximumRepetitions = () => {
 		const visitor = new PagesVisitor(pages);
