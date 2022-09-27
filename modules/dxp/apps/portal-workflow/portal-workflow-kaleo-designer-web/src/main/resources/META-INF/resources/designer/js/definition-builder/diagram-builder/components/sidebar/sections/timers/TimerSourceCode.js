@@ -11,7 +11,6 @@
 
 import React, {useContext} from 'react';
 
-import {DEFAULT_LANGUAGE} from '../../../../../source-builder/constants';
 import {DiagramBuilderContext} from '../../../../DiagramBuilderContext';
 import BaseSourceCode from '../shared-components/BaseSourceCode';
 
@@ -20,6 +19,9 @@ const TimerSourceCode = () => {
 
 	const scriptSourceCode =
 		selectedItem.data.taskTimers?.reassignments?.[0]?.script;
+
+	const scriptLanguage =
+		selectedItem.data.taskTimers?.reassignments?.[0]?.scriptLanguage;
 
 	const updateTimer = (editor) => {
 		if (editor.getData().trim() !== '') {
@@ -33,7 +35,7 @@ const TimerSourceCode = () => {
 							{
 								assignmentType: ['scriptedAssignment'],
 								script: [editor.getData()],
-								scriptLanguage: [DEFAULT_LANGUAGE],
+								scriptLanguage: [scriptLanguage],
 							},
 						],
 					},
