@@ -103,6 +103,8 @@ export default function ObjectFieldFormBase({
 		TObjectRelationship
 	>();
 
+	const [isNewState, setIsNewState] = useState(false);
+
 	useEffect(() => {
 		const {businessType, defaultValue, objectFieldSettings} = values;
 
@@ -332,6 +334,7 @@ export default function ObjectFieldFormBase({
 						onToggle={async (state) => {
 							if (state) {
 								setValues({required: state, state});
+								setIsNewState(true);
 								setPickListItems(
 									await API.getPickListItems(
 										values.listTypeDefinitionId!
@@ -378,7 +381,8 @@ export default function ObjectFieldFormBase({
 
 			{values.businessType === 'Picklist' &&
 				values.state &&
-				!picklistDefaultValue && (
+				!picklistDefaultValue &&
+				!isNewState && (
 					<div className="c-mt-1">
 						<ClayAlert
 							displayType="danger"
