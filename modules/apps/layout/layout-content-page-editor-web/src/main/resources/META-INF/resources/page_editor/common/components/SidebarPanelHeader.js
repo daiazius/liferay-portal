@@ -29,7 +29,7 @@ export default function SidebarPanelHeader({children}) {
 				'align-items-center d-flex justify-content-between my-3 pl-3 pr-2 page-editor__sidebar__panel-header'
 			)}
 		>
-			<h1 className="flex-grow-1 mb-0 mr-1 text-3">{children}</h1>
+			<h2 className="flex-grow-1 mb-0 mr-1 text-3">{children}</h2>
 
 			<ClayButtonWithIcon
 				displayType="unstyled"
