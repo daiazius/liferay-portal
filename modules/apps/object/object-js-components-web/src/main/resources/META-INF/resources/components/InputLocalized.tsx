@@ -20,10 +20,10 @@ import {FieldBase} from './FieldBase';
 
 import './InputLocalized.scss';
 
-const defaultLanguageId = Liferay.ThemeDisplay.getDefaultLanguageId();
+const currentLanguageId = Liferay.ThemeDisplay.getLanguageId();
 
 const availableLocales = Object.keys(Liferay.Language.available)
-	.sort((languageId) => (languageId === defaultLanguageId ? -1 : 1))
+	.sort((languageId) => (languageId === currentLanguageId ? -1 : 1))
 	.map((language) => ({
 		label: language as Locale,
 		symbol: language.replace('_', '-').toLowerCase(),
