@@ -19,6 +19,7 @@ import com.liferay.portal.bundle.blacklist.internal.configuration.BundleBlacklis
 import com.liferay.portal.configuration.metatype.bnd.util.ConfigurableUtil;
 import com.liferay.portal.kernel.log.Log;
 import com.liferay.portal.kernel.log.LogFactoryUtil;
+import com.liferay.portal.kernel.util.HashMapDictionary;
 import com.liferay.portal.lpkg.deployer.LPKGDeployer;
 
 import java.io.File;
@@ -30,6 +31,7 @@ import java.io.OutputStream;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Dictionary;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -44,10 +46,12 @@ import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleEvent;
 import org.osgi.framework.BundleListener;
+import org.osgi.framework.ServiceRegistration;
 import org.osgi.framework.SynchronousBundleListener;
 import org.osgi.framework.startlevel.BundleStartLevel;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Modified;
 import org.osgi.service.component.annotations.Reference;
 
@@ -130,6 +134,25 @@ public class BundleBlacklist {
 				_removeFromBlacklistFile(symbolicName);
 			}
 		}
+
+		Dictionary<String, Object> bundleBlacklistProperties =
+			new HashMapDictionary<>();
+
+		for (Map.Entry<String, String> entry : properties.entrySet()) {
+			String key = entry.getKey();
+
+			if (key.startsWith("component.name")) {
+				bundleBlacklistProperties.put(key, entry.getValue());
+			}
+		}
+
+		_serviceRegistration = bundleContext.registerService(
+			BundleBlacklist.class, this, bundleBlacklistProperties);
+	}
+
+	@Deactivate
+	protected void deactivate() {
+		_serviceRegistration.unregister();
 	}
 
 	private void _addToBlacklistFile(
@@ -278,6 +301,7 @@ public class BundleBlacklist {
 	private LPKGDeployer _lpkgDeployer;
 
 	private volatile BundleListener _selfMonitorBundleListener;
+	private volatile ServiceRegistration<?> _serviceRegistration;
 	private final Map<String, UninstalledBundleData> _uninstalledBundles =
 		new ConcurrentHashMap<>();
 
