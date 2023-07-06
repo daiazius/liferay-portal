@@ -457,7 +457,7 @@ public class DefaultValidator implements org.owasp.esapi.Validator {
 			if ( !parent.isDirectory() ) {
 				throw new ValidationException( context + ": Invalid directory name", "Invalid directory, specified parent is not a directory: context=" + context + ", input=" + input + ", parent=" + parent );
 			}
-			if ( !dir.getCanonicalPath().startsWith(parent.getCanonicalPath() ) ) {
+			if ( !dir.getCanonicalFile().toPath().startsWith( parent.getCanonicalFile().toPath() ) ) {
 				throw new ValidationException( context + ": Invalid directory name", "Invalid directory, not inside specified parent: context=" + context + ", input=" + input + ", parent=" + parent );
 			}
 
@@ -1192,3 +1192,4 @@ public class DefaultValidator implements org.owasp.esapi.Validator {
 		return (input==null || input.length == 0);
 	}
 }
+/* @generated */
