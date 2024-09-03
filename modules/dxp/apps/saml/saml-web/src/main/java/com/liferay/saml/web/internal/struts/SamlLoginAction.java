@@ -114,9 +114,6 @@ public class SamlLoginAction extends BaseSamlStrutsAction {
 					"redirecting-to-your-identity-provider"));
 		}
 		else if (samlSpIdpConnections.size() == 1) {
-			Layout layout = (Layout)httpServletRequest.getAttribute(
-				WebKeys.LAYOUT);
-
 			Company company = _portal.getCompany(httpServletRequest);
 
 			ThemeDisplay themeDisplay =
@@ -124,8 +121,8 @@ public class SamlLoginAction extends BaseSamlStrutsAction {
 					WebKeys.THEME_DISPLAY);
 
 			String title = _layoutSEOLinkManager.getFullPageTitle(
-				layout, null, null, null, null, company.getName(),
-				themeDisplay.getLocale());
+				(Layout)httpServletRequest.getAttribute(WebKeys.LAYOUT), null,
+				null, null, null, company.getName(), themeDisplay.getLocale());
 
 			JspUtil.dispatch(
 				httpServletRequest, httpServletResponse,
