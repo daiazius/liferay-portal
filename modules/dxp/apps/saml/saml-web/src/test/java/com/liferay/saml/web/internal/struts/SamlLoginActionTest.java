@@ -8,7 +8,6 @@ package com.liferay.saml.web.internal.struts;
 import com.liferay.layout.seo.kernel.LayoutSEOLink;
 import com.liferay.layout.seo.kernel.LayoutSEOLinkManager;
 import com.liferay.portal.kernel.exception.PortalException;
-import com.liferay.portal.kernel.json.JSONFactory;
 import com.liferay.portal.kernel.json.JSONFactoryUtil;
 import com.liferay.portal.kernel.model.Company;
 import com.liferay.portal.kernel.model.Layout;
@@ -39,6 +38,7 @@ import java.util.function.Predicate;
 import javax.servlet.http.HttpServletRequest;
 
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
@@ -59,45 +59,16 @@ public class SamlLoginActionTest {
 	public static final LiferayUnitTestRule liferayUnitTestRule =
 		LiferayUnitTestRule.INSTANCE;
 
+	@Before
+	public void setUp() throws Exception {
+		_setUpPortal();
+		_setUpSamlProviderConfigurationHelper();
+		_setUpSamlSpIdpConnectionLocalService();
+	}
+
 	@Test
 	public void testPageTitleIsSameWhenRedirectMessageIsDisabled()
 		throws Exception {
-
-		SamlLoginAction samlLoginAction = new SamlLoginAction();
-
-		ReflectionTestUtil.setFieldValue(
-			samlLoginAction, "_samlProviderConfigurationHelper",
-			_createSamlProviderConfigurationHelper());
-
-		Props props = Mockito.mock(Props.class);
-
-		Mockito.when(
-			props.get("saml.idp.redirect.message.enabled")
-		).thenReturn(
-			"false"
-		);
-
-		ReflectionTestUtil.setFieldValue(samlLoginAction, "_props", props);
-
-		String companyName = RandomTestUtil.randomString();
-
-		ReflectionTestUtil.setFieldValue(
-			samlLoginAction, "_portal", _createPortal(companyName));
-
-		ReflectionTestUtil.setFieldValue(
-			samlLoginAction, "_samlSpIdpConnectionLocalService",
-			_createSamlSpIdpConnectionLocalService());
-
-		JSONFactory jsonFactory = Mockito.mock(JSONFactory.class);
-
-		Mockito.when(
-			jsonFactory.createJSONArray()
-		).thenReturn(
-			JSONFactoryUtil.createJSONArray()
-		);
-
-		ReflectionTestUtil.setFieldValue(
-			samlLoginAction, "_jsonFactory", jsonFactory);
 
 		LayoutSEOLinkManager layoutSEOLinkManager = new LayoutSEOLinkManager() {
 
@@ -134,7 +105,20 @@ public class SamlLoginActionTest {
 		};
 
 		ReflectionTestUtil.setFieldValue(
-			samlLoginAction, "_layoutSEOLinkManager", layoutSEOLinkManager);
+			_samlLoginAction, "_layoutSEOLinkManager", layoutSEOLinkManager);
+
+		ReflectionTestUtil.setFieldValue(
+			_samlLoginAction, "_jsonFactory", JSONFactoryUtil.getJSONFactory());
+
+		Props props = Mockito.mock(Props.class);
+
+		Mockito.when(
+			props.get("saml.idp.redirect.message.enabled")
+		).thenReturn(
+			"false"
+		);
+
+		ReflectionTestUtil.setFieldValue(_samlLoginAction, "_props", props);
 
 		MockHttpServletRequest mockHttpServletRequest =
 			new MockHttpServletRequest();
@@ -162,7 +146,7 @@ public class SamlLoginActionTest {
 		mockHttpServletRequest.setAttribute(
 			WebKeys.THEME_DISPLAY, themeDisplay);
 
-		samlLoginAction.execute(
+		_samlLoginAction.execute(
 			mockHttpServletRequest, new MockHttpServletResponse());
 
 		Definition definition = (Definition)mockHttpServletRequest.getAttribute(
@@ -171,26 +155,21 @@ public class SamlLoginActionTest {
 		Map<String, String> definitionAttributes = definition.getAttributes();
 
 		Assert.assertEquals(
-			StringUtil.merge(new String[] {htmlTitle, companyName}, _SEPARATOR),
+			StringUtil.merge(
+				new String[] {htmlTitle, _COMPANY_NAME}, _SEPARATOR),
 			definitionAttributes.get("title"));
 	}
 
-	private Portal _createPortal(String companyName) throws Exception {
-		Portal portal = Mockito.mock(Portal.class);
-
-		Mockito.when(
-			portal.getCompanyId(Mockito.any(HttpServletRequest.class))
-		).thenReturn(
-			RandomTestUtil.randomLong()
-		);
-
+	private void _setUpPortal() throws Exception {
 		Company company = Mockito.mock(Company.class);
 
 		Mockito.when(
 			company.getName()
 		).thenReturn(
-			companyName
+			_COMPANY_NAME
 		);
+
+		Portal portal = Mockito.mock(Portal.class);
 
 		Mockito.when(
 			portal.getCompany(Mockito.any(HttpServletRequest.class))
@@ -198,20 +177,18 @@ public class SamlLoginActionTest {
 			company
 		);
 
-		return portal;
+		Mockito.when(
+			portal.getCompanyId(Mockito.any(HttpServletRequest.class))
+		).thenReturn(
+			RandomTestUtil.randomLong()
+		);
+
+		ReflectionTestUtil.setFieldValue(_samlLoginAction, "_portal", portal);
 	}
 
-	private SamlProviderConfigurationHelper
-		_createSamlProviderConfigurationHelper() {
-
+	private void _setUpSamlProviderConfigurationHelper() {
 		SamlProviderConfigurationHelper samlProviderConfigurationHelper =
 			Mockito.mock(SamlProviderConfigurationHelper.class);
-
-		Mockito.when(
-			samlProviderConfigurationHelper.isRoleSp()
-		).thenReturn(
-			true
-		);
 
 		Mockito.when(
 			samlProviderConfigurationHelper.isEnabled()
@@ -219,33 +196,39 @@ public class SamlLoginActionTest {
 			true
 		);
 
-		return samlProviderConfigurationHelper;
+		Mockito.when(
+			samlProviderConfigurationHelper.isRoleSp()
+		).thenReturn(
+			true
+		);
+
+		ReflectionTestUtil.setFieldValue(
+			_samlLoginAction, "_samlProviderConfigurationHelper",
+			samlProviderConfigurationHelper);
 	}
 
-	private SamlSpIdpConnectionLocalService
-		_createSamlSpIdpConnectionLocalService() {
-
-		SamlSpIdpConnectionLocalService samlSpIdpConnectionLocalService =
-			Mockito.mock(SamlSpIdpConnectionLocalService.class);
-
-		List<SamlSpIdpConnection> samlSpIdpConnections = new ArrayList<>();
-
+	private void _setUpSamlSpIdpConnectionLocalService() {
 		SamlSpIdpConnection samlSpIdpConnection = Mockito.mock(
 			SamlSpIdpConnection.class);
 
+		Mockito.when(
+			samlSpIdpConnection.isEnabled()
+		).thenReturn(
+			true
+		);
+
+		List<SamlSpIdpConnection> samlSpIdpConnections = new ArrayList<>();
+
 		samlSpIdpConnections.add(samlSpIdpConnection);
+
+		SamlSpIdpConnectionLocalService samlSpIdpConnectionLocalService =
+			Mockito.mock(SamlSpIdpConnectionLocalService.class);
 
 		Mockito.when(
 			samlSpIdpConnectionLocalService.getSamlSpIdpConnections(
 				Mockito.anyLong())
 		).thenReturn(
 			samlSpIdpConnections
-		);
-
-		Mockito.when(
-			samlSpIdpConnection.isEnabled()
-		).thenReturn(
-			true
 		);
 
 		_listUtilMockedStatic.when(
@@ -255,12 +238,18 @@ public class SamlLoginActionTest {
 			samlSpIdpConnections
 		);
 
-		return samlSpIdpConnectionLocalService;
+		ReflectionTestUtil.setFieldValue(
+			_samlLoginAction, "_samlSpIdpConnectionLocalService",
+			samlSpIdpConnectionLocalService);
 	}
+
+	private static final String _COMPANY_NAME = RandomTestUtil.randomString();
 
 	private static final String _SEPARATOR = " - ";
 
 	private static final MockedStatic<ListUtil> _listUtilMockedStatic =
 		Mockito.mockStatic(ListUtil.class);
+
+	private final SamlLoginAction _samlLoginAction = new SamlLoginAction();
 
 }
