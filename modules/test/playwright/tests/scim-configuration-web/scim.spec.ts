@@ -14,6 +14,7 @@ import {liferayConfig} from '../../liferay.config';
 import {VirtualInstancesPage} from '../../pages/portal-instances-web/VirtualInstancesPage';
 import {ApplicationsMenuPage} from '../../pages/product-navigation-applications-menu/ApplicationsMenuPage';
 import {SCIMConfigurationPage} from '../../pages/scim-configuraiton-web/SCIMConfigurationPage';
+import {clickAndExpectToBeVisible} from '../../utils/clickAndExpectToBeVisible';
 import {getRandomInt} from '../../utils/getRandomInt';
 import performLogin, {performLogout} from '../../utils/performLogin';
 
@@ -407,6 +408,69 @@ test('LPD-34644: Check if the token expiration warning message appears in the SC
 	await scimConfigurationPage.goTo();
 
 	await expect(scimConfigurationPage.alertMessage).toBeVisible();
+
+	await scimConfigurationPage.resetClientData();
+});
+
+test('LPS-97345 (TC-14). A SCIM Client cannot update a User if they are linked to a different SCIM Client.', async ({
+	page,
+}) => {
+	const scimConfigurationPage = new SCIMConfigurationPage(page);
+
+	await scimConfigurationPage.goTo();
+
+	await scimConfigurationPage.configureSCIM('email', 'test1');
+
+	await scimConfigurationPage.generateToken();
+
+	const randomNumber = getRandomInt();
+
+	const newUser = {
+		active: true,
+		emails: [
+			{
+				primary: true,
+				type: 'default',
+				value: `able${randomNumber}@liferay.com`,
+			},
+		],
+		name: {
+			familyName: `Baker ${randomNumber}`,
+			givenName: `Able ${randomNumber}`,
+		},
+		userName: `able${randomNumber}.baker`,
+	};
+
+	const apiHelper = new ApiHelpers(page);
+
+	const postResponse = await apiHelper.scim.postUser(newUser);
+
+	const applicationsMenuPage = new ApplicationsMenuPage(page);
+
+	await applicationsMenuPage.goToOauth2Administration();
+	await page.waitForTimeout(1000);
+
+	const row = await page.getByRole('row').filter({hasText: 'SCIM_test1'});
+
+	await clickAndExpectToBeVisible({
+		autoClick: true,
+		target: page.getByRole('link', {name: 'Delete'}),
+		trigger: row.locator('.dropdown-toggle'),
+	});
+
+	await scimConfigurationPage.goTo();
+
+	await scimConfigurationPage.configureSCIM('email', 'test2');
+
+	await scimConfigurationPage.generateToken();
+
+	const putResponse = await (
+		await apiHelper.scim.putUser(newUser, postResponse.id)
+	).text();
+
+	expect(putResponse).toContain(
+		'User was provisioned by another SCIM client'
+	);
 
 	await scimConfigurationPage.resetClientData();
 });

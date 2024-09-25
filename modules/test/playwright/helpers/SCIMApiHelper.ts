@@ -109,4 +109,17 @@ export class SCIMApiHelper {
 			}
 		);
 	}
+
+	async putUser(data: any, id: string) {
+		return this.apiHelpers.putResponse(
+			`${this.apiHelpers.baseUrl}${this.basePath}v2/Users/${id}`,
+			{
+				data,
+				headers: {
+					'Content-Type': 'application/scim+json',
+					...(await this.apiHelpers.getCSRFTokenHeader()),
+				},
+			}
+		);
+	}
 }
