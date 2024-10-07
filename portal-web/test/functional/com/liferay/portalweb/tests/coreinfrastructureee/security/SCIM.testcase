@@ -217,7 +217,6 @@ definition {
 	}
 
 	@description = "This is a use case for LPS-97345 (TC-10). If POST/Users tries to create a User that is already linked to another SCIM Client, the creation will fail."
-	@ignore = "true"
 	@priority = 5
 	test SCIMClientCannotPostAUserIfTheyAreLinkedToAnotherClient {
 		property test.liferay.virtual.instance = "false";
@@ -251,23 +250,16 @@ definition {
 				expected = '''"emails":[{"type":"default","value":"eren@liferay.com"''');
 		}
 
-		task ("When: Another SCIM Client is set up and it tries to post the same User") {
-			Navigator.openURL(baseURL = "http://localhost:8080");
+		task ("When: Another SCIM Client is set up through a .config file and it tries to post the same User") {
+			var companyId = JSONCompany.getCompanyId();
 
-			ApplicationsMenu.gotoPortlet(
-				category = "Configuration",
-				panel = "Control Panel",
-				portlet = "Instance Settings");
+			OSGiConfig.deployOSGiConfigFile(
+				osgiConfigFileName = "com.liferay.scim.client.configuration.ScimClientOAuth2ApplicationConfiguration.config",
+				osgiConfigs = "applicationName=\"AnotherName\",companyId=L\"${companyId}\",matcherField=\"emailAddress\"");
 
-			PortalSettings.gotoConfiguration(
-				configurationCategory = "SCIM",
-				configurationName = "SCIM",
-				configurationScope = "Virtual Instance Scope");
+			OSGiConfig.waitForOSGiConfig();
 
-			SCIM.configureSCIM(
-				applicationName = "AnotherName",
-				generateAccessToken = "Yeah",
-				matcherField = "userName");
+			WaitForConsoleTextPresent(value1 = "New access token for SCIM OAuth 2 application Test Application Name generated");
 		}
 
 		task ("Then: The posting will fail, as the User is linked to a different SCIM Client") {
