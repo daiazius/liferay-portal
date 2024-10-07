@@ -474,3 +474,64 @@ test('LPS-97345 (TC-14). A SCIM Client cannot update a User if they are linked t
 
 	await scimConfigurationPage.resetClientData();
 });
+
+test('LPS-97345 (TC-10). If POST/Users tries to create a User that is already linked to another SCIM Client, the creation will fail.', async ({
+	page,
+}) => {
+	const scimConfigurationPage = new SCIMConfigurationPage(page);
+
+	await scimConfigurationPage.goTo();
+
+	await scimConfigurationPage.configureSCIM('email', 'test1');
+
+	await scimConfigurationPage.generateToken();
+
+	const randomNumber = getRandomInt();
+
+	const newUser = {
+		active: true,
+		emails: [
+			{
+				primary: true,
+				type: 'default',
+				value: `able${randomNumber}@liferay.com`,
+			},
+		],
+		name: {
+			familyName: `Baker ${randomNumber}`,
+			givenName: `Able ${randomNumber}`,
+		},
+		userName: `able${randomNumber}.baker`,
+	};
+
+	const apiHelper = new ApiHelpers(page);
+
+	await apiHelper.scim.postUser(newUser);
+
+	const applicationsMenuPage = new ApplicationsMenuPage(page);
+
+	await applicationsMenuPage.goToOauth2Administration();
+	await page.waitForTimeout(1000);
+
+	const row = await page.getByRole('row').filter({hasText: 'SCIM_test1'});
+
+	await clickAndExpectToBeVisible({
+		autoClick: true,
+		target: page.getByRole('link', {name: 'Delete'}),
+		trigger: row.locator('.dropdown-toggle'),
+	});
+
+	await scimConfigurationPage.goTo();
+
+	await scimConfigurationPage.configureSCIM('email', 'test2');
+
+	await scimConfigurationPage.generateToken();
+
+	const postResponse2 = await (await apiHelper.scim.postUser(newUser)).text();
+
+	expect(postResponse2).toContain(
+		'User was provisioned by another SCIM client'
+	);
+
+	await scimConfigurationPage.resetClientData();
+});
