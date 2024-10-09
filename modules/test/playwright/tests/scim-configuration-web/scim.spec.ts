@@ -527,7 +527,9 @@ test('LPS-97345 (TC-10). If POST/Users tries to create a User that is already li
 
 	await scimConfigurationPage.generateToken();
 
-	const postResponse2 = await (await apiHelper.scim.postUser(newUser)).text();
+	const postResponse2 = await (
+		await apiHelper.scim.postUserWithResponse(newUser)
+	).text();
 
 	expect(postResponse2).toContain(
 		'User was provisioned by another SCIM client'
