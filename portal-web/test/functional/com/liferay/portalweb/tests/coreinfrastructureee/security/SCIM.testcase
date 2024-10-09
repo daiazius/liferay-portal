@@ -163,7 +163,6 @@ definition {
 	}
 
 	@description = "This is a use case for LPS-191052. TC-1 and TC-2 and TC-3: Verify that the system administrator can configure a SCIM client by deploying a config file and then register the SCIM client in the OAuth2 application."
-	@ignore = "true"
 	@priority = 5
 	test SCIMClientCanBeConfiguredViaConfigFile {
 		property test.liferay.virtual.instance = "false";
@@ -340,7 +339,6 @@ definition {
 	}
 
 	@description = "This is a use case for LPS-191052. TC-4: Verify that the config file of the SCIM client works well with companyWebID."
-	@ignore = "true"
 	@priority = 5
 	test SCIMClientConfigFileCanWorkByCompanyWebID {
 		property test.liferay.virtual.instance = "false";
