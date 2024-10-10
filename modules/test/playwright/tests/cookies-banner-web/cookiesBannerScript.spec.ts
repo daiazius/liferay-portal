@@ -22,41 +22,36 @@ test('@LPD-25701 Cookie Banner Script', async ({
 	systemSettingsPage,
 }) => {
 	await test.step('Go to page and click edit', async () => {
-		await page.goto(layout.friendlyURL);
+		await page.goto(`${layout.friendlyURL}?p_l_mode=edit`);
 
-		const editButton = page.getByRole('link', {name: 'Edit'});
-
-		await editButton.waitFor({state: 'visible'});
-		await editButton.click();
+		await page.waitForTimeout(500);
 	});
 
 	await test.step('Drag and drop html to page', async () => {
 		const searchFragment = page.getByLabel('Search Fragments and Widgets');
 
 		await searchFragment.waitFor({state: 'visible'});
-		await searchFragment.click();
 		await searchFragment.fill('html');
+
+		await page.waitForTimeout(500);
 
 		const htmlItem = page.getByRole('menuitem', {
 			name: 'HTML Add HTML Mark HTML as Favorite',
 		});
 
-		await htmlItem.waitFor({state: 'visible'});
-
-		await htmlItem.dragTo(page.locator('#page-editor div').nth(1));
+		await htmlItem.dragTo(
+			page.getByText('Drag and drop fragments or widgets here.')
+		);
 	});
 
 	await test.step('Add script to html and save page', async () => {
 		const htmlExample = page.getByText('HTML Example');
 
-		await htmlExample.waitFor({state: 'visible'});
-		await htmlExample.click();
 		await htmlExample.click();
 		await htmlExample.click();
 
 		const htmlSection = page.locator('.CodeMirror-scroll');
 
-		await htmlSection.waitFor({state: 'visible'});
 		await htmlSection.click();
 
 		const textarea = page.locator('textarea');
@@ -132,11 +127,7 @@ test('@LPD-25701 Cookie Banner Script', async ({
 			)
 			.waitFor({state: 'visible'});
 
-		const acceptAll = page.getByRole('button', {name: 'Accept All'});
-
-		await acceptAll.waitFor({state: 'visible'});
-
-		await acceptAll.click();
+		await page.getByRole('button', {name: 'Accept All'}).click();
 	});
 
 	await test.step('Check if script changed html', async () => {
