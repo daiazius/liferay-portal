@@ -22,7 +22,8 @@ public class ExpandoFieldQueryBuilderFactory
 	@Override
 	public FieldQueryBuilder getQueryBuilder(String fieldName) {
 		if (fieldName.startsWith("expando__keyword__") &&
-			!fieldName.endsWith("_geolocation")) {
+			!fieldName.endsWith("_geolocation") &&
+			!fieldName.endsWith("_scimClientId")) {
 
 			return substringQueryBuilder;
 		}
