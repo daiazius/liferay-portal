@@ -10,6 +10,9 @@ import {loginTest} from '../../fixtures/loginTest';
 
 export const test = mergeTests(loginTest(), applicationsMenuPageTest);
 
+const AUDIT_PORTLET_NAMESPACE =
+	'#_com_liferay_portal_security_audit_web_portlet_AuditPortlet_';
+
 const PRIVATE_RENDER_PARAMETER_NAMESPACE = 'priv_r_p_';
 
 const dateFields = [
@@ -91,4 +94,27 @@ test('LPD-40224: Check if the export audit events resource URL has all search pa
 	for (const field of fieldsWithoutNamespace) {
 		expect(exportURL).toContain(field);
 	}
+
+	expect(exportURL.length).toBeLessThan(2048);
+});
+
+test("LPS-192555: Assert that the page's URL with advanced search doesn't get over 2048 characters", async ({
+	applicationsMenuPage,
+	page,
+}) => {
+	await applicationsMenuPage.goToAudit();
+
+	await page.locator('#toggle_id_audit_event_searchtoggleAdvanced').click();
+
+	await page.locator(AUDIT_PORTLET_NAMESPACE + 'userName').fill('test test');
+
+	await page.locator(AUDIT_PORTLET_NAMESPACE + 'eventType').fill('LOGIN');
+
+	await page.locator('.lexicon-icon-search').click();
+
+	await page.waitForTimeout(500);
+
+	const pageURL = page.url();
+
+	expect(pageURL.length).toBeLessThan(2048);
 });
