@@ -1,0 +1,13 @@
+assemble:
+    - from: build/static
+      into: static
+captcha-test-poc-altcha:
+    friendlyURLMapping: captcha-test-poc-altcha
+    htmlElementName: captcha-test-poc-altcha
+    instanceable: false
+    name: Captcha Test POC Altcha
+    portletCategoryName: category.client-extensions
+    type: customElement
+    urls:
+        - js/main.*.js
+    useESM: true
