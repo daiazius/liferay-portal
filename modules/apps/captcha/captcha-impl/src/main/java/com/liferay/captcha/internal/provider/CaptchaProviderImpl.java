@@ -12,6 +12,9 @@ import com.liferay.osgi.service.tracker.collections.map.ServiceTrackerMapFactory
 import com.liferay.portal.configuration.metatype.bnd.util.ConfigurableUtil;
 import com.liferay.portal.kernel.captcha.Captcha;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.osgi.framework.BundleContext;
@@ -34,6 +37,17 @@ public class CaptchaProviderImpl implements CaptchaProvider {
 		String captchaClassName = _captchaConfiguration.captchaEngine();
 
 		return _serviceTrackerMap.getService(captchaClassName);
+	}
+
+	@Override
+	public Map<String, Captcha> getCaptchas() {
+		Map<String, Captcha> captchas = new HashMap<>();
+
+		for(String captcha: _serviceTrackerMap.keySet()) {
+			captchas.put(captcha, _serviceTrackerMap.getService(captcha));
+		}
+
+		return captchas;
 	}
 
 	@Activate

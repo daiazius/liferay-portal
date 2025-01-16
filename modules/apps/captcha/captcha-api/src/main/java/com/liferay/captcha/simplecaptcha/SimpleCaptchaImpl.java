@@ -217,7 +217,7 @@ public class SimpleCaptchaImpl implements Captcha {
 
 	@Activate
 	@Modified
-	protected void activate(Map<String, Object> properties) {
+	protected void activate(Map<String, Object> properties) throws Exception {
 		_captchaConfiguration = ConfigurableUtil.createConfigurable(
 			CaptchaConfiguration.class, properties);
 
