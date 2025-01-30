@@ -52,6 +52,11 @@ import org.osgi.service.component.annotations.Reference;
 public class ReCaptchaImpl extends SimpleCaptchaImpl {
 
 	@Override
+	public String getCaptchaName() {
+		return _CAPTCHA_NAME;
+	}
+
+	@Override
 	public String getTaglibPath() {
 		return _TAGLIB_PATH;
 	}
@@ -183,6 +188,8 @@ public class ReCaptchaImpl extends SimpleCaptchaImpl {
 		return validateChallenge(
 			PortalUtil.getHttpServletRequest(portletRequest));
 	}
+
+	private static final String _CAPTCHA_NAME = "reCAPTCHA";
 
 	private static final String _TAGLIB_PATH = "/captcha/recaptcha.jsp";
 

@@ -36,18 +36,22 @@ public class CaptchaConfigurationFieldOptionsProvider
 
 		return TransformUtil.transform(
 			captchas.entrySet(),
-			captcha -> new Option() {
+			captchaEntry -> {
+				Captcha captcha = captchaEntry.getValue();
 
-				@Override
-				public String getLabel(Locale locale) {
-					return captcha.getKey();
-				}
+				return new Option() {
 
-				@Override
-				public String getValue() {
-					return captcha.getKey();
-				}
+					@Override
+					public String getLabel(Locale locale) {
+						return captcha.getCaptchaName();
+					}
 
+					@Override
+					public String getValue() {
+						return captchaEntry.getKey();
+					}
+
+				};
 			});
 	}
 

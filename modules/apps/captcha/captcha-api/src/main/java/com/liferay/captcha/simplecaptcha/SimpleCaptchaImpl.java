@@ -99,6 +99,11 @@ public class SimpleCaptchaImpl implements Captcha {
 	}
 
 	@Override
+	public String getCaptchaName() {
+		return _CAPTCHA_NAME;
+	}
+
+	@Override
 	public String getTaglibPath() {
 		return _TAGLIB_PATH;
 	}
@@ -510,6 +515,8 @@ public class SimpleCaptchaImpl implements Captcha {
 
 	private static final String _CAPTCHA_MAX_CHALLENGES =
 		SimpleCaptchaImpl.class.getName() + "#CAPTCHA_MAX_CHALLENGES";
+
+	private static final String _CAPTCHA_NAME = "SimpleCaptcha";
 
 	private static final String _TAGLIB_PATH = "/captcha/simplecaptcha.jsp";
 
