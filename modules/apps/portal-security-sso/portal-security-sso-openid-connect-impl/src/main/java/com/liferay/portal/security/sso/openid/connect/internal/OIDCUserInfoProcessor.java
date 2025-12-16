@@ -5,6 +5,8 @@
 
 package com.liferay.portal.security.sso.openid.connect.internal;
 
+import com.liferay.asset.kernel.service.AssetCategoryLocalService;
+import com.liferay.asset.kernel.service.AssetTagLocalService;
 import com.liferay.expando.kernel.model.ExpandoColumn;
 import com.liferay.expando.kernel.model.ExpandoColumnConstants;
 import com.liferay.expando.kernel.model.ExpandoTable;
@@ -325,6 +327,13 @@ public class OIDCUserInfoProcessor {
 		Contact contact = user.getContact();
 
 		serviceContext.setUuid(user.getUuid());
+
+		serviceContext.setAssetCategoryIds(
+			_assetCategoryLocalService.getCategoryIds(
+				User.class.getName(), user.getUserId()));
+		serviceContext.setAssetTagNames(
+			_assetTagLocalService.getTagNames(
+				User.class.getName(), user.getUserId()));
 
 		_addOrUpdateUserCustomClaims(
 			oAuthClientEntry.getCustomClaimsJSON(), user, userInfoJSONObject);
@@ -883,6 +892,12 @@ public class OIDCUserInfoProcessor {
 
 	@Reference
 	private AddressLocalService _addressLocalService;
+
+	@Reference
+	private AssetCategoryLocalService _assetCategoryLocalService;
+
+	@Reference
+	private AssetTagLocalService _assetTagLocalService;
 
 	@Reference
 	private ClassNameLocalService _classNameLocalService;
