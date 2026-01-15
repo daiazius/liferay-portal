@@ -63,6 +63,10 @@ public class TaskResourceImpl extends BaseTaskResourceImpl {
 				task.getContext(), contextHttpServletRequest, _sse,
 				externalReferenceCode);
 
+		workflowContext.put(
+			"liferayAIHubAuthenticationToken",
+			contextHttpServletRequest.getHeader(
+				"Liferay-AI-Hub-Authorization"));
 		workflowContext.put("outBoundEventName", task.getType());
 
 		WorkflowInstance workflowInstance =

@@ -104,7 +104,9 @@ public class LLMNodeExecutor extends BaseNodeExecutor {
 			AssistantHandlerContext.builder(
 			).contentRetriever(
 				ContentRetrieverUtil.createContentRetriever(
-					kaleoNodeSettingValues)
+					kaleoNodeSettingValues,
+					GetterUtil.getString(
+						workflowContext.get("liferayAIHubAuthenticationToken")))
 			).invocationParameters(
 				InvocationParameters.from(
 					Map.of(
