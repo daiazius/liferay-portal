@@ -436,6 +436,11 @@ public class TaskResourceTest extends BaseTaskResourceTestCase {
 			).toString(),
 			"ai-hub/v1.0/by-external-reference-code/" + sseEventSinkKey +
 				"/tasks",
+			HashMapBuilder.put(
+				"Liferay-AI-Hub-Authorization",
+				_generateLiferayAIHubAuthenticationToken(
+					TestPropsValues.getUserId())
+			).build(),
 			Http.Method.POST);
 
 		Assert.assertTrue(countDownLatch1.await(10, TimeUnit.SECONDS));
@@ -470,6 +475,11 @@ public class TaskResourceTest extends BaseTaskResourceTestCase {
 			).toString(),
 			"ai-hub/v1.0/by-external-reference-code/" + sseEventSinkKey +
 				"/tasks",
+			HashMapBuilder.put(
+				"Liferay-AI-Hub-Authorization",
+				_generateLiferayAIHubAuthenticationToken(
+					TestPropsValues.getUserId())
+			).build(),
 			Http.Method.POST);
 
 		Assert.assertTrue(countDownLatch2.await(10, TimeUnit.SECONDS));
