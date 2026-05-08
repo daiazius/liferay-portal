@@ -28,18 +28,18 @@ public class AIHubCellConfigurationModelListenerTest {
 
 	@Test
 	public void test() {
+		AIHubCellConfigurationModelListener
+			aiHubCellConfigurationModelListener =
+				new AIHubCellConfigurationModelListener();
+
 		Dictionary<String, Object> properties = new Hashtable<>();
 
-		_aiHubCellConfigurationModelListener.onBeforeSave("pid", properties);
+		aiHubCellConfigurationModelListener.onBeforeSave("pid", properties);
 
 		String secret = GetterUtil.getString(properties.get("secret"));
 
 		Assert.assertFalse(Validator.isBlank(secret));
 		Assert.assertEquals(64, Base64.decode(secret).length);
 	}
-
-	private final AIHubCellConfigurationModelListener
-		_aiHubCellConfigurationModelListener =
-			new AIHubCellConfigurationModelListener();
 
 }
