@@ -37,6 +37,15 @@ public class KeyReferenceUtilTest {
 	}
 
 	@Test
+	public void testIsValidKeyReference() {
+		for (String keyReferenceString : _KEY_REFERENCE_STRINGS_INVALID) {
+			Assert.assertFalse(
+				keyReferenceString,
+				KeyReferenceUtil.isValidKeyReference(keyReferenceString));
+		}
+	}
+
+	@Test
 	public void testToKeyReference() {
 		_assertKeyReference(
 			"${keyRef:provider:identifier}", "identifier", "provider",
@@ -70,17 +79,7 @@ public class KeyReferenceUtilTest {
 
 	@Test
 	public void testToKeyReferenceWithInvalidKeyReference() {
-		for (String keyReferenceString :
-				new String[] {
-					null, "", "abc", "${}", "${secretRef}", "${secretRef:",
-					"${secretRef:}", "${secretRef:provider}",
-					"${secretRef:provider:}", "${secretRef::identifier}",
-					"${secretRef:provider:identifier",
-					"${SecretRef:provider:identifier}",
-					"${secretRef:provider:identifier}trailing",
-					"${secretRef:provider:null}", "${secretRef:provider:   }"
-				}) {
-
+		for (String keyReferenceString : _KEY_REFERENCE_STRINGS_INVALID) {
 			Assert.assertThrows(
 				keyReferenceString, IllegalArgumentException.class,
 				() -> KeyReferenceUtil.toKeyReference(keyReferenceString));
@@ -90,6 +89,10 @@ public class KeyReferenceUtilTest {
 	private void _assertKeyReference(
 		String keyReferenceString, String identifier, String providerId,
 		KeyReference.Type type) {
+
+		Assert.assertTrue(
+			keyReferenceString,
+			KeyReferenceUtil.isValidKeyReference(keyReferenceString));
 
 		KeyReference keyReference = KeyReferenceUtil.toKeyReference(
 			keyReferenceString);
@@ -101,5 +104,14 @@ public class KeyReferenceUtilTest {
 			keyReferenceString,
 			KeyReferenceUtil.toKeyReferenceString(keyReference));
 	}
+
+	private static final String[] _KEY_REFERENCE_STRINGS_INVALID = {
+		null, "", "abc", "${}", "${secretRef}", "${secretRef:", "${secretRef:}",
+		"${secretRef:provider}", "${secretRef:provider:}",
+		"${secretRef::identifier}", "${secretRef:provider:identifier",
+		"${SecretRef:provider:identifier}",
+		"${secretRef:provider:identifier}trailing",
+		"${secretRef:provider:null}", "${secretRef:provider:   }"
+	};
 
 }

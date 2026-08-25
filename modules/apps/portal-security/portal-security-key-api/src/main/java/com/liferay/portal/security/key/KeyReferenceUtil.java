@@ -26,6 +26,14 @@ public class KeyReferenceUtil {
 		return false;
 	}
 
+	public static boolean isValidKeyReference(String value) {
+		if (_parse(value) != null) {
+			return true;
+		}
+
+		return false;
+	}
+
 	public static KeyReference toKeyReference(String keyReferenceString) {
 		KeyReference keyReference = _parse(keyReferenceString);
 
