@@ -7,7 +7,6 @@ package com.liferay.portal.security.key.internal.configuration.plugin;
 
 import com.liferay.portal.configuration.metatype.annotations.ExtendedObjectClassDefinition;
 import com.liferay.portal.kernel.model.CompanyConstants;
-import com.liferay.portal.kernel.module.service.Snapshot;
 import com.liferay.portal.kernel.test.ReflectionTestUtil;
 import com.liferay.portal.kernel.test.util.RandomTestUtil;
 import com.liferay.portal.kernel.util.HashMapDictionaryBuilder;
@@ -15,7 +14,10 @@ import com.liferay.portal.security.key.secret.SecretResolver;
 import com.liferay.portal.security.key.secret.exception.SecretException;
 import com.liferay.portal.test.rule.LiferayUnitTestRule;
 
+import java.util.Collections;
 import java.util.Dictionary;
+import java.util.List;
+import java.util.Set;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -26,6 +28,12 @@ import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
+
+import org.osgi.framework.BundleContext;
+import org.osgi.framework.Constants;
+import org.osgi.service.cm.Configuration;
+import org.osgi.service.cm.ConfigurationAdmin;
+import org.osgi.util.tracker.ServiceTracker;
 
 /**
  * @author Pedro Victor Silvestre
@@ -42,11 +50,14 @@ public class SecretReferenceConfigurationPluginImplTest {
 		MockitoAnnotations.openMocks(this);
 
 		ReflectionTestUtil.setFieldValue(
-			SecretReferenceConfigurationPluginImpl.class,
-			"_secretResolverSnapshot", _snapshot);
+			_secretReferenceConfigurationPluginImpl, "_configurationAdmin",
+			_configurationAdmin);
+		ReflectionTestUtil.setFieldValue(
+			_secretReferenceConfigurationPluginImpl,
+			"_secretResolverServiceTracker", _secretResolverServiceTracker);
 
 		Mockito.when(
-			_snapshot.get()
+			_secretResolverServiceTracker.getService()
 		).thenReturn(
 			_secretResolver
 		);
@@ -78,6 +89,8 @@ public class SecretReferenceConfigurationPluginImplTest {
 
 		Dictionary<String, Object> properties =
 			HashMapDictionaryBuilder.<String, Object>put(
+				Constants.SERVICE_PID, _PID
+			).put(
 				"otherPassword", _SECRET_REFERENCE_OTHER
 			).put(
 				"password", _SECRET_REFERENCE
@@ -104,6 +117,8 @@ public class SecretReferenceConfigurationPluginImplTest {
 		Assert.assertEquals(
 			_SECRET_REFERENCE_OTHER, properties.get("otherPassword"));
 		Assert.assertEquals(value, properties.get("password"));
+
+		Assert.assertTrue(_getPids().contains(_PID));
 	}
 
 	@Test
@@ -111,13 +126,15 @@ public class SecretReferenceConfigurationPluginImplTest {
 		throws Exception {
 
 		Mockito.when(
-			_snapshot.get()
+			_secretResolverServiceTracker.getService()
 		).thenReturn(
 			null
 		);
 
 		Dictionary<String, Object> properties =
 			HashMapDictionaryBuilder.<String, Object>put(
+				Constants.SERVICE_PID, _PID
+			).put(
 				"password", _SECRET_REFERENCE
 			).build();
 
@@ -125,6 +142,8 @@ public class SecretReferenceConfigurationPluginImplTest {
 			null, properties);
 
 		Assert.assertEquals(_SECRET_REFERENCE, properties.get("password"));
+
+		Assert.assertTrue(_getPids().contains(_PID));
 	}
 
 	@Test
@@ -180,6 +199,75 @@ public class SecretReferenceConfigurationPluginImplTest {
 		Assert.assertEquals(42, properties.get("size"));
 	}
 
+	@Test
+	public void testRedeliverWhenConfigurationAdminFails() throws Exception {
+		_record();
+
+		Mockito.when(
+			_configurationAdmin.listConfigurations(_FILTER)
+		).thenThrow(
+			new IllegalStateException()
+		);
+
+		_redeliver();
+
+		Assert.assertTrue(_getPids().isEmpty());
+	}
+
+	@Test
+	public void testRedeliverWhenConfigurationIsMissing() throws Exception {
+		_record();
+
+		Mockito.when(
+			_configurationAdmin.listConfigurations(_FILTER)
+		).thenReturn(
+			null
+		);
+
+		_redeliver();
+
+		Assert.assertTrue(_getPids().isEmpty());
+	}
+
+	@Test
+	public void testRedeliverWhenNothingIsRecorded() throws Exception {
+		_redeliver();
+
+		Mockito.verifyNoInteractions(_configurationAdmin);
+	}
+
+	@Test
+	public void testRedeliverWhenPidIsRecorded() throws Exception {
+		_record();
+
+		Dictionary<String, Object> properties =
+			HashMapDictionaryBuilder.<String, Object>put(
+				"password", _SECRET_REFERENCE
+			).build();
+
+		Mockito.when(
+			_configuration.getProperties()
+		).thenReturn(
+			properties
+		);
+
+		Mockito.when(
+			_configurationAdmin.listConfigurations(_FILTER)
+		).thenReturn(
+			new Configuration[] {_configuration}
+		);
+
+		_redeliver();
+
+		Mockito.verify(
+			_configuration
+		).update(
+			properties
+		);
+
+		Assert.assertTrue(_getPids().isEmpty());
+	}
+
 	private void _assertResolvedPassword(
 			long companyId, Dictionary<String, Object> properties)
 		throws Exception {
@@ -198,20 +286,54 @@ public class SecretReferenceConfigurationPluginImplTest {
 		Assert.assertEquals(value, properties.get("password"));
 	}
 
+	private Set<String> _getPids() {
+		return ReflectionTestUtil.getFieldValue(
+			_secretReferenceConfigurationPluginImpl, "_pids");
+	}
+
+	private void _record() {
+		ReflectionTestUtil.invoke(
+			_secretReferenceConfigurationPluginImpl, "_record",
+			new Class<?>[] {List.class, String.class, Dictionary.class},
+			Collections.singletonList("password"), _PID,
+			HashMapDictionaryBuilder.<String, Object>put(
+				"password", _SECRET_REFERENCE
+			).build());
+	}
+
+	private void _redeliver() {
+		ReflectionTestUtil.invoke(
+			_secretReferenceConfigurationPluginImpl, "_redeliver",
+			new Class<?>[0]);
+	}
+
+	private static final String _FILTER =
+		"(service.pid=com.liferay.test.Configuration)";
+
+	private static final String _PID = "com.liferay.test.Configuration";
+
 	private static final String _SECRET_REFERENCE =
 		"${secretRef:provider:identifier}";
 
 	private static final String _SECRET_REFERENCE_OTHER =
 		"${secretRef:provider:other}";
 
+	@Mock
+	private Configuration _configuration;
+
+	@Mock
+	private ConfigurationAdmin _configurationAdmin;
+
 	private final SecretReferenceConfigurationPluginImpl
 		_secretReferenceConfigurationPluginImpl =
-			new SecretReferenceConfigurationPluginImpl();
+			new SecretReferenceConfigurationPluginImpl(
+				Mockito.mock(BundleContext.class));
 
 	@Mock
 	private SecretResolver _secretResolver;
 
 	@Mock
-	private Snapshot<SecretResolver> _snapshot;
+	private ServiceTracker<SecretResolver, SecretResolver>
+		_secretResolverServiceTracker;
 
 }

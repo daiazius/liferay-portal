@@ -11,19 +11,26 @@ import com.liferay.portal.kernel.dao.db.DBManagerUtil;
 import com.liferay.portal.kernel.log.Log;
 import com.liferay.portal.kernel.log.LogFactoryUtil;
 import com.liferay.portal.kernel.model.CompanyConstants;
-import com.liferay.portal.kernel.module.service.Snapshot;
 import com.liferay.portal.kernel.util.GetterUtil;
+import com.liferay.portal.kernel.util.Validator;
+import com.liferay.portal.security.key.KeyReference;
 import com.liferay.portal.security.key.KeyReferenceUtil;
 import com.liferay.portal.security.key.secret.SecretResolver;
 import com.liferay.portal.security.key.secret.exception.SecretException;
+import com.liferay.portal.security.key.spi.secret.SecretProvider;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Dictionary;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Predicate;
 
 import javax.sql.DataSource;
@@ -31,22 +38,32 @@ import javax.sql.DataSource;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.Constants;
 import org.osgi.framework.ServiceReference;
+import org.osgi.service.cm.Configuration;
+import org.osgi.service.cm.ConfigurationAdmin;
 import org.osgi.service.cm.ConfigurationPlugin;
-import org.osgi.service.component.annotations.Activate;
-import org.osgi.service.component.annotations.Component;
+import org.osgi.util.tracker.ServiceTracker;
+import org.osgi.util.tracker.ServiceTrackerCustomizer;
 
 /**
  * @author Pedro Victor Silvestre
  */
-@Component(
-	property = {
-		"config.plugin.id=com.liferay.portal.security.key.internal.configuration.plugin.SecretReferenceConfigurationPluginImpl",
-		"service.cmRanking:Integer=1000"
-	},
-	service = ConfigurationPlugin.class
-)
 public class SecretReferenceConfigurationPluginImpl
 	implements ConfigurationPlugin {
+
+	public SecretReferenceConfigurationPluginImpl(BundleContext bundleContext) {
+		_bundleContext = bundleContext;
+	}
+
+	public void close() {
+		_secretProviderServiceTracker.close();
+		_secretResolverServiceTracker.close();
+
+		_executorService.shutdownNow();
+
+		if (_configurationAdminServiceReference != null) {
+			_bundleContext.ungetService(_configurationAdminServiceReference);
+		}
+	}
 
 	@Override
 	public void modifyConfiguration(
@@ -64,7 +81,8 @@ public class SecretReferenceConfigurationPluginImpl
 		String pid = GetterUtil.getString(
 			properties.get(Constants.SERVICE_PID));
 
-		SecretResolver secretResolver = _secretResolverSnapshot.get();
+		SecretResolver secretResolver =
+			_secretResolverServiceTracker.getService();
 
 		if (secretResolver == null) {
 			if (_log.isWarnEnabled()) {
@@ -74,6 +92,8 @@ public class SecretReferenceConfigurationPluginImpl
 						"configuration \"", pid,
 						"\" because the secret resolver is unavailable"));
 			}
+
+			_record(keys, pid, properties);
 
 			return;
 		}
@@ -88,6 +108,8 @@ public class SecretReferenceConfigurationPluginImpl
 						"configuration \"", pid,
 						"\" because its company is unknown"));
 			}
+
+			_record(keys, pid, properties);
 
 			return;
 		}
@@ -114,11 +136,23 @@ public class SecretReferenceConfigurationPluginImpl
 				properties.put(key, resolvedValues);
 			}
 		}
+
+		_record(keys, pid, properties);
 	}
 
-	@Activate
-	protected void activate(BundleContext bundleContext) {
-		_bundleContext = bundleContext;
+	public void open() {
+		_configurationAdminServiceReference =
+			_bundleContext.getServiceReference(ConfigurationAdmin.class);
+
+		if (_configurationAdminServiceReference != null) {
+			_configurationAdmin = _bundleContext.getService(
+				_configurationAdminServiceReference);
+		}
+
+		_secretProviderServiceTracker = _openServiceTracker(
+			SecretProvider.class);
+		_secretResolverServiceTracker = _openServiceTracker(
+			SecretResolver.class);
 	}
 
 	private Long _getCompanyId(Dictionary<String, Object> properties) {
@@ -209,6 +243,96 @@ public class SecretReferenceConfigurationPluginImpl
 		return false;
 	}
 
+	private boolean _isSecretReference(String value) {
+		if (!KeyReferenceUtil.isValidKeyReference(value)) {
+			return false;
+		}
+
+		KeyReference keyReference = KeyReferenceUtil.toKeyReference(value);
+
+		if (keyReference.getType() == KeyReference.Type.SECRET) {
+			return true;
+		}
+
+		return false;
+	}
+
+	private <T> ServiceTracker<T, T> _openServiceTracker(Class<T> clazz) {
+		ServiceTracker<T, T> serviceTracker = new ServiceTracker<>(
+			_bundleContext, clazz,
+			new ServiceTrackerCustomizer<T, T>() {
+
+				@Override
+				public T addingService(ServiceReference<T> serviceReference) {
+					if (!_pids.isEmpty()) {
+						_executorService.submit(
+							SecretReferenceConfigurationPluginImpl.this::
+								_redeliver);
+					}
+
+					return _bundleContext.getService(serviceReference);
+				}
+
+				@Override
+				public void modifiedService(
+					ServiceReference<T> serviceReference, T service) {
+				}
+
+				@Override
+				public void removedService(
+					ServiceReference<T> serviceReference, T service) {
+
+					_bundleContext.ungetService(serviceReference);
+				}
+
+			});
+
+		serviceTracker.open();
+
+		return serviceTracker;
+	}
+
+	private void _record(
+		List<String> keys, String pid, Dictionary<String, Object> properties) {
+
+		if (Validator.isNull(pid) ||
+			!_hasReference(keys, this::_isSecretReference, properties)) {
+
+			return;
+		}
+
+		_pids.add(pid);
+	}
+
+	private void _redeliver() {
+		if (_configurationAdmin == null) {
+			return;
+		}
+
+		for (String pid : new ArrayList<>(_pids)) {
+			_pids.remove(pid);
+
+			try {
+				Configuration[] configurations =
+					_configurationAdmin.listConfigurations(
+						"(service.pid=" + pid + ")");
+
+				if (configurations == null) {
+					continue;
+				}
+
+				for (Configuration configuration : configurations) {
+					configuration.update(configuration.getProperties());
+				}
+			}
+			catch (Exception exception) {
+				_log.error(
+					"Unable to redeliver configuration \"" + pid + "\"",
+					exception);
+			}
+		}
+	}
+
 	private String _resolve(
 		long companyId, String key, String pid, SecretResolver secretResolver,
 		String value) {
@@ -237,11 +361,16 @@ public class SecretReferenceConfigurationPluginImpl
 	private static final Log _log = LogFactoryUtil.getLog(
 		SecretReferenceConfigurationPluginImpl.class);
 
-	private static final Snapshot<SecretResolver> _secretResolverSnapshot =
-		new Snapshot<>(
-			SecretReferenceConfigurationPluginImpl.class, SecretResolver.class,
-			null, true);
-
-	private BundleContext _bundleContext;
+	private final BundleContext _bundleContext;
+	private ConfigurationAdmin _configurationAdmin;
+	private ServiceReference<ConfigurationAdmin>
+		_configurationAdminServiceReference;
+	private final ExecutorService _executorService =
+		Executors.newSingleThreadExecutor();
+	private final Set<String> _pids = ConcurrentHashMap.newKeySet();
+	private ServiceTracker<SecretProvider, SecretProvider>
+		_secretProviderServiceTracker;
+	private ServiceTracker<SecretResolver, SecretResolver>
+		_secretResolverServiceTracker;
 
 }
