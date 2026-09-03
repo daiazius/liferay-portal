@@ -6,6 +6,11 @@
 package com.liferay.sharepoint.rest.repository.internal.document.library.repository.authorization.oauth2;
 
 import com.liferay.document.library.repository.authorization.oauth2.Token;
+import com.liferay.petra.reflect.ReflectionUtil;
+import com.liferay.portal.kernel.module.service.Snapshot;
+import com.liferay.portal.kernel.security.auth.CompanyThreadLocal;
+import com.liferay.portal.security.key.secret.SecretResolver;
+import com.liferay.portal.security.key.secret.exception.SecretException;
 import com.liferay.sharepoint.rest.repository.internal.configuration.SharepointRepositoryConfiguration;
 
 import com.microsoft.aad.msal4j.AuthorizationCodeParameters;
@@ -122,7 +127,7 @@ public class SharepointRepositoryTokenBroker {
 		return ConfidentialClientApplication.builder(
 			_sharepointRepositoryConfiguration.clientId(),
 			ClientCredentialFactory.createFromSecret(
-				_sharepointRepositoryConfiguration.clientSecret())
+				_resolve(_sharepointRepositoryConfiguration.clientSecret()))
 		).authority(
 			"https://login.microsoftonline.com/" +
 				_sharepointRepositoryConfiguration.tenantId()
@@ -142,6 +147,27 @@ public class SharepointRepositoryTokenBroker {
 
 		return iterator.next();
 	}
+
+	private String _resolve(String value) {
+		SecretResolver secretResolver = _secretResolverSnapshot.get();
+
+		if (secretResolver == null) {
+			throw new IllegalStateException("Secret resolver is unavailable");
+		}
+
+		try {
+			return secretResolver.resolve(
+				CompanyThreadLocal.getCompanyId(), value);
+		}
+		catch (SecretException secretException) {
+			return ReflectionUtil.throwException(secretException);
+		}
+	}
+
+	private static final Snapshot<SecretResolver> _secretResolverSnapshot =
+		new Snapshot<>(
+			SharepointRepositoryTokenBroker.class, SecretResolver.class, null,
+			true);
 
 	private final SharepointRepositoryConfiguration
 		_sharepointRepositoryConfiguration;

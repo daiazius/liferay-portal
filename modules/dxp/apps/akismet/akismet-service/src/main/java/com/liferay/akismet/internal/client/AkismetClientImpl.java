@@ -11,6 +11,7 @@ import com.liferay.akismet.internal.configuration.AkismetServiceConfiguration;
 import com.liferay.akismet.model.AkismetEntry;
 import com.liferay.akismet.service.AkismetEntryLocalService;
 import com.liferay.message.boards.model.MBMessage;
+import com.liferay.petra.reflect.ReflectionUtil;
 import com.liferay.petra.string.StringBundler;
 import com.liferay.petra.string.StringPool;
 import com.liferay.portal.configuration.metatype.bnd.util.ConfigurableUtil;
@@ -18,6 +19,7 @@ import com.liferay.portal.kernel.exception.PortalException;
 import com.liferay.portal.kernel.log.Log;
 import com.liferay.portal.kernel.log.LogFactoryUtil;
 import com.liferay.portal.kernel.model.Company;
+import com.liferay.portal.kernel.model.CompanyConstants;
 import com.liferay.portal.kernel.model.User;
 import com.liferay.portal.kernel.service.CompanyLocalService;
 import com.liferay.portal.kernel.service.UserLocalService;
@@ -27,6 +29,8 @@ import com.liferay.portal.kernel.util.Http;
 import com.liferay.portal.kernel.util.Portal;
 import com.liferay.portal.kernel.util.StringUtil;
 import com.liferay.portal.kernel.util.Validator;
+import com.liferay.portal.security.key.secret.SecretResolver;
+import com.liferay.portal.security.key.secret.exception.SecretException;
 
 import java.io.IOException;
 
@@ -70,7 +74,8 @@ public class AkismetClientImpl implements AkismetClient {
 		throws PortalException {
 
 		String location = StringBundler.concat(
-			Http.HTTP_WITH_SLASH, _akismetServiceConfiguration.akismetApiKey(),
+			Http.HTTP_WITH_SLASH,
+			_resolve(_akismetServiceConfiguration.akismetApiKey()),
 			StringPool.PERIOD, AkismetConstants.URL_REST,
 			AkismetConstants.PATH_CHECK_SPAM);
 
@@ -114,7 +119,8 @@ public class AkismetClientImpl implements AkismetClient {
 		}
 
 		String location = StringBundler.concat(
-			Http.HTTP_WITH_SLASH, _akismetServiceConfiguration.akismetApiKey(),
+			Http.HTTP_WITH_SLASH,
+			_resolve(_akismetServiceConfiguration.akismetApiKey()),
 			StringPool.PERIOD, AkismetConstants.URL_REST,
 			AkismetConstants.PATH_SUBMIT_HAM);
 
@@ -163,7 +169,8 @@ public class AkismetClientImpl implements AkismetClient {
 		}
 
 		String location = StringBundler.concat(
-			Http.HTTP_WITH_SLASH, _akismetServiceConfiguration.akismetApiKey(),
+			Http.HTTP_WITH_SLASH,
+			_resolve(_akismetServiceConfiguration.akismetApiKey()),
 			StringPool.PERIOD, AkismetConstants.URL_REST,
 			AkismetConstants.PATH_SUBMIT_SPAM);
 
@@ -173,7 +180,8 @@ public class AkismetClientImpl implements AkismetClient {
 
 		if (Validator.isNull(response) ||
 			!verifyApiKey(
-				companyId, _akismetServiceConfiguration.akismetApiKey())) {
+				companyId,
+				_resolve(_akismetServiceConfiguration.akismetApiKey()))) {
 
 			_log.error("There was an issue submitting message as spam");
 		}
@@ -231,6 +239,15 @@ public class AkismetClientImpl implements AkismetClient {
 		return _portal.getPortalURL(
 			company.getVirtualHostname(), _portal.getPortalServerPort(false),
 			false);
+	}
+
+	private String _resolve(String value) {
+		try {
+			return _secretResolver.resolve(CompanyConstants.SYSTEM, value);
+		}
+		catch (SecretException secretException) {
+			return ReflectionUtil.throwException(secretException);
+		}
 	}
 
 	private String _sendRequest(
@@ -296,6 +313,9 @@ public class AkismetClientImpl implements AkismetClient {
 
 	@Reference
 	private Portal _portal;
+
+	@Reference
+	private SecretResolver _secretResolver;
 
 	@Reference
 	private UserLocalService _userLocalService;

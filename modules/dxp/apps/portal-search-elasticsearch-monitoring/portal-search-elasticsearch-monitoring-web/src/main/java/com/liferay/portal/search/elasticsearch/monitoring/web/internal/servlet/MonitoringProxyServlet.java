@@ -5,10 +5,12 @@
 
 package com.liferay.portal.search.elasticsearch.monitoring.web.internal.servlet;
 
+import com.liferay.petra.reflect.ReflectionUtil;
 import com.liferay.petra.string.StringPool;
 import com.liferay.portal.configuration.metatype.bnd.util.ConfigurableUtil;
 import com.liferay.portal.kernel.log.Log;
 import com.liferay.portal.kernel.log.LogFactoryUtil;
+import com.liferay.portal.kernel.model.CompanyConstants;
 import com.liferay.portal.kernel.model.User;
 import com.liferay.portal.kernel.security.auth.PrincipalException;
 import com.liferay.portal.kernel.security.permission.ActionKeys;
@@ -24,6 +26,8 @@ import com.liferay.portal.search.elasticsearch.monitoring.web.internal.constants
 import com.liferay.portal.search.elasticsearch.monitoring.web.internal.constants.MonitoringProxyServletWebKeys;
 import com.liferay.portal.search.elasticsearch.monitoring.web.internal.constants.MonitoringWebConstants;
 import com.liferay.portal.search.elasticsearch.monitoring.web.internal.servlet.display.context.ErrorDisplayContext;
+import com.liferay.portal.security.key.secret.SecretResolver;
+import com.liferay.portal.security.key.secret.exception.SecretException;
 
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.Servlet;
@@ -195,7 +199,9 @@ public class MonitoringProxyServlet extends ProxyServlet {
 		String userName = GetterUtil.getString(
 			_monitoringConfiguration.kibanaUserName());
 		String password = GetterUtil.getString(
-			_monitoringConfiguration.kibanaPassword());
+			_resolve(
+				CompanyConstants.SYSTEM,
+				_monitoringConfiguration.kibanaPassword()));
 
 		String authorization = userName + ":" + password;
 
@@ -205,6 +211,15 @@ public class MonitoringProxyServlet extends ProxyServlet {
 	private void _replaceConfiguration(Map<String, Object> properties) {
 		_monitoringConfiguration = ConfigurableUtil.createConfigurable(
 			MonitoringConfiguration.class, properties);
+	}
+
+	private String _resolve(long companyId, String value) {
+		try {
+			return _secretResolver.resolve(companyId, value);
+		}
+		catch (SecretException secretException) {
+			return ReflectionUtil.throwException(secretException);
+		}
 	}
 
 	private void _sendError(
@@ -227,5 +242,8 @@ public class MonitoringProxyServlet extends ProxyServlet {
 		MonitoringProxyServlet.class);
 
 	private volatile MonitoringConfiguration _monitoringConfiguration;
+
+	@Reference
+	private SecretResolver _secretResolver;
 
 }
