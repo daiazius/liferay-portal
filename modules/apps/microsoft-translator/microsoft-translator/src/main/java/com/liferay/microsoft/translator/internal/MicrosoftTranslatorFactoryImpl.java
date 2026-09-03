@@ -6,9 +6,13 @@
 package com.liferay.microsoft.translator.internal;
 
 import com.liferay.microsoft.translator.internal.configuration.MicrosoftTranslatorConfiguration;
+import com.liferay.petra.reflect.ReflectionUtil;
 import com.liferay.portal.configuration.metatype.bnd.util.ConfigurableUtil;
 import com.liferay.portal.kernel.microsofttranslator.MicrosoftTranslator;
 import com.liferay.portal.kernel.microsofttranslator.MicrosoftTranslatorFactory;
+import com.liferay.portal.kernel.model.CompanyConstants;
+import com.liferay.portal.security.key.secret.SecretResolver;
+import com.liferay.portal.security.key.secret.exception.SecretException;
 
 import java.util.Map;
 
@@ -16,6 +20,7 @@ import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Modified;
+import org.osgi.service.component.annotations.Reference;
 
 /**
  * @author Hugo Huijser
@@ -31,7 +36,7 @@ public class MicrosoftTranslatorFactoryImpl
 	public MicrosoftTranslator getMicrosoftTranslator() {
 		if (_microsoftTranslator == null) {
 			_microsoftTranslator = new MicrosoftTranslatorImpl(
-				_microsoftTranslatorConfiguration.subscriptionKey());
+				_resolve(_microsoftTranslatorConfiguration.subscriptionKey()));
 		}
 
 		return _microsoftTranslator;
@@ -51,8 +56,20 @@ public class MicrosoftTranslatorFactoryImpl
 		_microsoftTranslator = null;
 	}
 
+	private String _resolve(String value) {
+		try {
+			return _secretResolver.resolve(CompanyConstants.SYSTEM, value);
+		}
+		catch (SecretException secretException) {
+			return ReflectionUtil.throwException(secretException);
+		}
+	}
+
 	private volatile MicrosoftTranslator _microsoftTranslator;
 	private volatile MicrosoftTranslatorConfiguration
 		_microsoftTranslatorConfiguration;
+
+	@Reference
+	private SecretResolver _secretResolver;
 
 }

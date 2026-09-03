@@ -6,13 +6,17 @@
 package com.liferay.portal.settings.authentication.ldap.web.internal.display.context;
 
 import com.liferay.petra.function.UnsafeConsumer;
+import com.liferay.petra.reflect.ReflectionUtil;
 import com.liferay.portal.kernel.log.Log;
 import com.liferay.portal.kernel.log.LogFactoryUtil;
+import com.liferay.portal.kernel.module.service.Snapshot;
 import com.liferay.portal.kernel.security.fips.FIPSModeValidator;
 import com.liferay.portal.kernel.util.HashMapBuilder;
 import com.liferay.portal.kernel.util.ParamUtil;
 import com.liferay.portal.kernel.util.Portal;
 import com.liferay.portal.kernel.util.StringUtil;
+import com.liferay.portal.security.key.secret.SecretResolver;
+import com.liferay.portal.security.key.secret.exception.SecretException;
 import com.liferay.portal.security.ldap.SafeLdapContext;
 import com.liferay.portal.security.ldap.SafeLdapFilter;
 import com.liferay.portal.security.ldap.SafeLdapNameFactory;
@@ -149,6 +153,12 @@ public class LDAPTestDisplayContext {
 			return credentials;
 		}
 
+		SecretResolver secretResolver = _secretResolverSnapshot.get();
+
+		if (secretResolver == null) {
+			throw new IllegalStateException("Secret resolver is unavailable");
+		}
+
 		ConfigurationProvider<LDAPServerConfiguration>
 			ldapServerConfigurationProvider =
 				ConfigurationProviderUtil.getLDAPServerConfigurationProvider();
@@ -158,7 +168,13 @@ public class LDAPTestDisplayContext {
 				_companyId,
 				ParamUtil.getLong(_httpServletRequest, "ldapServerId"));
 
-		return ldapServerConfiguration.securityCredential();
+		try {
+			return secretResolver.resolve(
+				_companyId, ldapServerConfiguration.securityCredential());
+		}
+		catch (SecretException secretException) {
+			return ReflectionUtil.throwException(secretException);
+		}
 	}
 
 	private Map<String, String> _getMappings(String prefix, String... names) {
@@ -198,6 +214,10 @@ public class LDAPTestDisplayContext {
 
 	private static final Log _log = LogFactoryUtil.getLog(
 		LDAPTestDisplayContext.class);
+
+	private static final Snapshot<SecretResolver> _secretResolverSnapshot =
+		new Snapshot<>(
+			LDAPTestDisplayContext.class, SecretResolver.class, null, true);
 
 	private final String _baseDN;
 	private final String _baseProviderURL;

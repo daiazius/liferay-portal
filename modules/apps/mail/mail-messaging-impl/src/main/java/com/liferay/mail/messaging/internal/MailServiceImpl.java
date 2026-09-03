@@ -12,6 +12,7 @@ import com.liferay.mail.kernel.model.MailMessage;
 import com.liferay.mail.kernel.service.MailService;
 import com.liferay.mail.settings.configuration.MailSettingCompanyConfiguration;
 import com.liferay.mail.settings.configuration.MailSettingSystemConfiguration;
+import com.liferay.petra.reflect.ReflectionUtil;
 import com.liferay.petra.string.StringBundler;
 import com.liferay.petra.string.StringPool;
 import com.liferay.portal.aop.AopService;
@@ -35,6 +36,8 @@ import com.liferay.portal.kernel.util.PropsKeys;
 import com.liferay.portal.kernel.util.PropsUtil;
 import com.liferay.portal.kernel.util.StringUtil;
 import com.liferay.portal.kernel.util.Validator;
+import com.liferay.portal.security.key.secret.SecretResolver;
+import com.liferay.portal.security.key.secret.exception.SecretException;
 
 import jakarta.mail.Authenticator;
 import jakarta.mail.PasswordAuthentication;
@@ -188,12 +191,14 @@ public class MailServiceImpl
 		String advancedPropertiesString =
 			mailSettingCompanyConfiguration.additionalJavaMailProperties();
 		String pop3Host = mailSettingCompanyConfiguration.incomingPOPServer();
-		String pop3Password = mailSettingCompanyConfiguration.popPassword();
+		String pop3Password = _resolve(
+			companyId, mailSettingCompanyConfiguration.popPassword());
 		int pop3Port = GetterUtil.getInteger(
 			mailSettingCompanyConfiguration.incomingPOPPort());
 		String pop3User = mailSettingCompanyConfiguration.popUserName();
 		String smtpHost = mailSettingCompanyConfiguration.outgoingSMTPServer();
-		String smtpPassword = mailSettingCompanyConfiguration.smtpPassword();
+		String smtpPassword = _resolve(
+			companyId, mailSettingCompanyConfiguration.smtpPassword());
 		int smtpPort = GetterUtil.getInteger(
 			mailSettingCompanyConfiguration.outgoingSMTPPort());
 		boolean smtpStartTLSEnable = GetterUtil.getBoolean(
@@ -443,6 +448,15 @@ public class MailServiceImpl
 		return properties;
 	}
 
+	private String _resolve(long companyId, String value) {
+		try {
+			return _secretResolver.resolve(companyId, value);
+		}
+		catch (SecretException secretException) {
+			return ReflectionUtil.throwException(secretException);
+		}
+	}
+
 	private static final Log _log = LogFactoryUtil.getLog(
 		MailServiceImpl.class);
 
@@ -451,6 +465,10 @@ public class MailServiceImpl
 
 	private volatile MailSettingSystemConfiguration
 		_mailSettingSystemConfiguration;
+
+	@Reference
+	private SecretResolver _secretResolver;
+
 	private final Map<Long, Session> _sessions = new ConcurrentHashMap<>();
 
 }

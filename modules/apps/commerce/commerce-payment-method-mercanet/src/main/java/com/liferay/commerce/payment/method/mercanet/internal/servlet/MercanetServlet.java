@@ -14,6 +14,7 @@ import com.liferay.commerce.payment.method.mercanet.internal.connector.Environme
 import com.liferay.commerce.payment.method.mercanet.internal.connector.PaypageClient;
 import com.liferay.commerce.payment.method.mercanet.internal.constants.MercanetCommercePaymentMethodConstants;
 import com.liferay.commerce.service.CommerceOrderLocalService;
+import com.liferay.petra.reflect.ReflectionUtil;
 import com.liferay.petra.string.CharPool;
 import com.liferay.petra.string.StringPool;
 import com.liferay.portal.configuration.module.configuration.ConfigurationProvider;
@@ -31,6 +32,8 @@ import com.liferay.portal.kernel.util.HashMapBuilder;
 import com.liferay.portal.kernel.util.ParamUtil;
 import com.liferay.portal.kernel.util.Portal;
 import com.liferay.portal.kernel.util.StringUtil;
+import com.liferay.portal.security.key.secret.SecretResolver;
+import com.liferay.portal.security.key.secret.exception.SecretException;
 
 import com.worldline.sips.model.PaypageResponse;
 import com.worldline.sips.model.ResponseCode;
@@ -199,7 +202,9 @@ public class MercanetServlet extends HttpServlet {
 					Environment.valueOf(environment),
 					mercanetGroupServiceConfiguration.merchantId(),
 					Integer.valueOf(keyVersion),
-					mercanetGroupServiceConfiguration.secretKey());
+					_resolve(
+						commerceOrder.getCompanyId(),
+						mercanetGroupServiceConfiguration.secretKey()));
 
 				PaypageResponse paypageResponse = paypageClient.decodeResponse(
 					HashMapBuilder.put(
@@ -267,6 +272,15 @@ public class MercanetServlet extends HttpServlet {
 		return map;
 	}
 
+	private String _resolve(long companyId, String value) {
+		try {
+			return _secretResolver.resolve(companyId, value);
+		}
+		catch (SecretException secretException) {
+			return ReflectionUtil.throwException(secretException);
+		}
+	}
+
 	private static final Log _log = LogFactoryUtil.getLog(
 		MercanetServlet.class);
 
@@ -284,6 +298,9 @@ public class MercanetServlet extends HttpServlet {
 
 	@Reference
 	private Portal _portal;
+
+	@Reference
+	private SecretResolver _secretResolver;
 
 	@Reference(
 		target = "(osgi.web.symbolicname=com.liferay.commerce.payment.method.mercanet)"

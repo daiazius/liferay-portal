@@ -7,6 +7,7 @@ package com.liferay.portal.security.ldap.internal;
 
 import com.liferay.petra.lang.SafeCloseable;
 import com.liferay.petra.lang.ThreadContextClassLoaderUtil;
+import com.liferay.petra.reflect.ReflectionUtil;
 import com.liferay.petra.string.CharPool;
 import com.liferay.petra.string.StringBundler;
 import com.liferay.petra.string.StringPool;
@@ -26,6 +27,8 @@ import com.liferay.portal.kernel.util.PropsUtil;
 import com.liferay.portal.kernel.util.PropsValues;
 import com.liferay.portal.kernel.util.StringUtil;
 import com.liferay.portal.kernel.util.Validator;
+import com.liferay.portal.security.key.secret.SecretResolver;
+import com.liferay.portal.security.key.secret.exception.SecretException;
 import com.liferay.portal.security.ldap.SafeLdapContext;
 import com.liferay.portal.security.ldap.SafeLdapFilter;
 import com.liferay.portal.security.ldap.SafeLdapFilterConstraints;
@@ -416,7 +419,7 @@ public class SafePortalLDAPImpl implements SafePortalLDAP {
 		return getSafeLdapContext(
 			companyId, ldapServerConfiguration.baseProviderURL(),
 			ldapServerConfiguration.securityPrincipal(),
-			ldapServerConfiguration.securityCredential());
+			_resolve(companyId, ldapServerConfiguration.securityCredential()));
 	}
 
 	@Override
@@ -1086,6 +1089,15 @@ public class SafePortalLDAPImpl implements SafePortalLDAP {
 			originalAttributeId, ";range=", start, StringPool.DASH, end);
 	}
 
+	private String _resolve(long companyId, String value) {
+		try {
+			return _secretResolver.resolve(companyId, value);
+		}
+		catch (SecretException secretException) {
+			return ReflectionUtil.throwException(secretException);
+		}
+	}
+
 	private static final Log _log = LogFactoryUtil.getLog(
 		SafePortalLDAPImpl.class);
 
@@ -1105,6 +1117,9 @@ public class SafePortalLDAPImpl implements SafePortalLDAP {
 
 	@Reference
 	private LDAPSettings _ldapSettings;
+
+	@Reference
+	private SecretResolver _secretResolver;
 
 	@Reference(
 		target = "(factoryPid=com.liferay.portal.security.ldap.configuration.SystemLDAPConfiguration)"

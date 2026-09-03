@@ -10,6 +10,7 @@ import com.liferay.oauth2.provider.rest.internal.configuration.OAuth2InAssertion
 import com.liferay.oauth2.provider.rest.internal.endpoint.constants.OAuth2ProviderRESTEndpointConstants;
 import com.liferay.oauth2.provider.rest.internal.endpoint.liferay.LiferayOAuthDataProvider;
 import com.liferay.oauth2.provider.util.OAuth2JWKValidatorUtil;
+import com.liferay.petra.reflect.ReflectionUtil;
 import com.liferay.petra.string.StringBundler;
 import com.liferay.petra.string.StringPool;
 import com.liferay.portal.configuration.metatype.bnd.util.ConfigurableUtil;
@@ -20,6 +21,8 @@ import com.liferay.portal.kernel.model.User;
 import com.liferay.portal.kernel.util.GetterUtil;
 import com.liferay.portal.kernel.util.MapUtil;
 import com.liferay.portal.kernel.util.StringUtil;
+import com.liferay.portal.security.key.secret.SecretResolver;
+import com.liferay.portal.security.key.secret.exception.SecretException;
 
 import jakarta.ws.rs.core.MultivaluedMap;
 
@@ -214,6 +217,15 @@ public class LiferayJWTBearerGrantHandler extends BaseAccessTokenGrantHandler {
 		return userAuthTypes.get(issuer);
 	}
 
+	private String _resolve(long companyId, String value) {
+		try {
+			return _secretResolver.resolve(companyId, value);
+		}
+		catch (SecretException secretException) {
+			return ReflectionUtil.throwException(secretException);
+		}
+	}
+
 	private static final Log _log = LogFactoryUtil.getLog(
 		LiferayJWTBearerGrantHandler.class);
 
@@ -226,6 +238,10 @@ public class LiferayJWTBearerGrantHandler extends BaseAccessTokenGrantHandler {
 	private LiferayOAuthDataProvider _liferayOAuthDataProvider;
 
 	private volatile OAuth2ProviderConfiguration _oAuth2ProviderConfiguration;
+
+	@Reference
+	private SecretResolver _secretResolver;
+
 	private ServiceRegistration<ManagedServiceFactory> _serviceRegistration;
 	private final Map<Long, Map<String, String>> _userAuthTypes =
 		new ConcurrentHashMap<>();
@@ -494,7 +510,10 @@ public class LiferayJWTBearerGrantHandler extends BaseAccessTokenGrantHandler {
 					jwsSignatureVerifiers.get(issuer);
 
 				JsonWebKeys jsonWebKeys = JwkUtils.readJwkSet(
-					oAuth2InAssertionConfiguration.signatureJSONWebKeySet());
+					_resolve(
+						companyId,
+						oAuth2InAssertionConfiguration.
+							signatureJSONWebKeySet()));
 
 				for (JsonWebKey jsonWebKey : jsonWebKeys.getKeys()) {
 					PublicKeyUse publicKeyUse = jsonWebKey.getPublicKeyUse();

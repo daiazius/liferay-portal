@@ -12,6 +12,8 @@ import com.liferay.portal.configuration.metatype.bnd.util.ConfigurableUtil;
 import com.liferay.portal.configuration.module.configuration.ConfigurationProvider;
 import com.liferay.portal.kernel.model.Group;
 import com.liferay.portal.kernel.module.configuration.ConfigurationException;
+import com.liferay.portal.security.key.secret.SecretResolver;
+import com.liferay.portal.security.key.secret.exception.SecretException;
 
 import java.util.Map;
 
@@ -29,14 +31,18 @@ import org.osgi.service.component.annotations.Reference;
 )
 public class LayoutReportsGooglePageSpeedConfigurationProvider {
 
-	public String getApiKey(Group group) throws ConfigurationException {
+	public String getApiKey(Group group)
+		throws ConfigurationException, SecretException {
+
 		LayoutReportsGooglePageSpeedGroupConfiguration
 			layoutReportsGooglePageSpeedGroupConfiguration =
 				_configurationProvider.getGroupConfiguration(
 					LayoutReportsGooglePageSpeedGroupConfiguration.class,
 					group.getCompanyId(), group.getGroupId());
 
-		return layoutReportsGooglePageSpeedGroupConfiguration.apiKey();
+		return _secretResolver.resolve(
+			group.getCompanyId(),
+			layoutReportsGooglePageSpeedGroupConfiguration.apiKey());
 	}
 
 	public String getStrategy(Group group) throws ConfigurationException {
@@ -101,5 +107,8 @@ public class LayoutReportsGooglePageSpeedConfigurationProvider {
 
 	private volatile LayoutReportsGooglePageSpeedConfiguration
 		_layoutReportsGooglePageSpeedConfiguration;
+
+	@Reference
+	private SecretResolver _secretResolver;
 
 }

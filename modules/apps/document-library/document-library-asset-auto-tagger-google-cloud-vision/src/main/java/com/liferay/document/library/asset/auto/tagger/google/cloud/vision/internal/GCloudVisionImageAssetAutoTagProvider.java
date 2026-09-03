@@ -8,6 +8,7 @@ package com.liferay.document.library.asset.auto.tagger.google.cloud.vision.inter
 import com.liferay.asset.auto.tagger.AssetAutoTagProvider;
 import com.liferay.document.library.asset.auto.tagger.google.cloud.vision.internal.configuration.GCloudVisionAssetAutoTagProviderCompanyConfiguration;
 import com.liferay.document.library.asset.auto.tagger.google.cloud.vision.internal.util.GCloudVisionUtil;
+import com.liferay.petra.reflect.ReflectionUtil;
 import com.liferay.petra.string.StringBundler;
 import com.liferay.petra.string.StringPool;
 import com.liferay.portal.configuration.module.configuration.ConfigurationProvider;
@@ -23,6 +24,8 @@ import com.liferay.portal.kernel.repository.capabilities.TemporaryFileEntriesCap
 import com.liferay.portal.kernel.repository.model.FileEntry;
 import com.liferay.portal.kernel.util.ContentTypes;
 import com.liferay.portal.kernel.util.Http;
+import com.liferay.portal.security.key.secret.SecretResolver;
+import com.liferay.portal.security.key.secret.exception.SecretException;
 
 import java.net.HttpURLConnection;
 
@@ -61,7 +64,10 @@ public class GCloudVisionImageAssetAutoTagProvider
 			}
 
 			JSONObject responseJSONObject = _queryGCloudVisionJSONObject(
-				gCloudVisionAssetAutoTagProviderCompanyConfiguration.apiKey(),
+				_resolve(
+					fileEntry.getCompanyId(),
+					gCloudVisionAssetAutoTagProviderCompanyConfiguration.
+						apiKey()),
 				GCloudVisionUtil.getAnnotateImagePayload(fileEntry));
 
 			JSONArray responsesJSONArray = responseJSONObject.getJSONArray(
@@ -135,6 +141,15 @@ public class GCloudVisionImageAssetAutoTagProvider
 		return _jsonFactory.createJSONObject(responseJSON);
 	}
 
+	private String _resolve(long companyId, String value) {
+		try {
+			return _secretResolver.resolve(companyId, value);
+		}
+		catch (SecretException secretException) {
+			return ReflectionUtil.throwException(secretException);
+		}
+	}
+
 	private static final Log _log = LogFactoryUtil.getLog(
 		GCloudVisionImageAssetAutoTagProvider.class);
 
@@ -150,5 +165,8 @@ public class GCloudVisionImageAssetAutoTagProvider
 
 	@Reference
 	private JSONFactory _jsonFactory;
+
+	@Reference
+	private SecretResolver _secretResolver;
 
 }

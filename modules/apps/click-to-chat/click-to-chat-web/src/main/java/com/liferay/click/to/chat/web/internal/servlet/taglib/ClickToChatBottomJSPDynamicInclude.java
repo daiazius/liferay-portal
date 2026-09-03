@@ -10,6 +10,7 @@ import com.liferay.click.to.chat.web.internal.configuration.ClickToChatConfigura
 import com.liferay.click.to.chat.web.internal.configuration.ClickToChatConfigurationUtil;
 import com.liferay.click.to.chat.web.internal.constants.ClickToChatConstants;
 import com.liferay.click.to.chat.web.internal.constants.ClickToChatWebKeys;
+import com.liferay.petra.reflect.ReflectionUtil;
 import com.liferay.portal.configuration.module.configuration.ConfigurationProvider;
 import com.liferay.portal.kernel.log.Log;
 import com.liferay.portal.kernel.log.LogFactoryUtil;
@@ -22,6 +23,8 @@ import com.liferay.portal.kernel.servlet.taglib.DynamicInclude;
 import com.liferay.portal.kernel.theme.ThemeDisplay;
 import com.liferay.portal.kernel.util.Validator;
 import com.liferay.portal.kernel.util.WebKeys;
+import com.liferay.portal.security.key.secret.SecretResolver;
+import com.liferay.portal.security.key.secret.exception.SecretException;
 
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.http.HttpServletRequest;
@@ -152,7 +155,9 @@ public class ClickToChatBottomJSPDynamicInclude extends BaseJSPDynamicInclude {
 			clickToChatConfiguration.chatProviderKeyId());
 		httpServletRequest.setAttribute(
 			ClickToChatWebKeys.CLICK_TO_CHAT_CHAT_PROVIDER_SECRET_KEY,
-			clickToChatConfiguration.chatProviderSecretKey());
+			_resolve(
+				themeDisplay.getCompanyId(),
+				clickToChatConfiguration.chatProviderSecretKey()));
 
 		super.include(httpServletRequest, httpServletResponse, key);
 	}
@@ -172,11 +177,23 @@ public class ClickToChatBottomJSPDynamicInclude extends BaseJSPDynamicInclude {
 		return _log;
 	}
 
+	private String _resolve(long companyId, String value) {
+		try {
+			return _secretResolver.resolve(companyId, value);
+		}
+		catch (SecretException secretException) {
+			return ReflectionUtil.throwException(secretException);
+		}
+	}
+
 	private static final Log _log = LogFactoryUtil.getLog(
 		ClickToChatBottomJSPDynamicInclude.class);
 
 	@Reference
 	private ConfigurationProvider _configurationProvider;
+
+	@Reference
+	private SecretResolver _secretResolver;
 
 	@Reference(target = "(osgi.web.symbolicname=com.liferay.click.to.chat.web)")
 	private ServletContext _servletContext;

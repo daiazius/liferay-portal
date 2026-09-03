@@ -5,12 +5,16 @@
 
 package com.liferay.portal.search.elasticsearch8.internal.configuration;
 
+import com.liferay.petra.reflect.ReflectionUtil;
 import com.liferay.petra.string.CharPool;
 import com.liferay.portal.configuration.metatype.bnd.util.ConfigurableUtil;
+import com.liferay.portal.kernel.model.CompanyConstants;
 import com.liferay.portal.kernel.util.PropsUtil;
 import com.liferay.portal.kernel.util.StringUtil;
 import com.liferay.portal.kernel.util.Validator;
 import com.liferay.portal.search.elasticsearch8.configuration.ElasticsearchConfiguration;
+import com.liferay.portal.security.key.secret.SecretResolver;
+import com.liferay.portal.security.key.secret.exception.SecretException;
 
 import java.util.Collections;
 import java.util.Comparator;
@@ -156,7 +160,7 @@ public class ElasticsearchConfigurationWrapper
 	}
 
 	public String password() {
-		return _elasticsearchConfiguration.password();
+		return _resolve(_elasticsearchConfiguration.password());
 	}
 
 	public boolean productionModeEnabled() {
@@ -168,7 +172,7 @@ public class ElasticsearchConfigurationWrapper
 	}
 
 	public String proxyPassword() {
-		return _elasticsearchConfiguration.proxyPassword();
+		return _resolve(_elasticsearchConfiguration.proxyPassword());
 	}
 
 	public int proxyPort() {
@@ -235,7 +239,7 @@ public class ElasticsearchConfigurationWrapper
 	}
 
 	public String truststorePassword() {
-		return _elasticsearchConfiguration.truststorePassword();
+		return _resolve(_elasticsearchConfiguration.truststorePassword());
 	}
 
 	public String truststorePath() {
@@ -302,6 +306,15 @@ public class ElasticsearchConfigurationWrapper
 		return propsMap;
 	}
 
+	private String _resolve(String value) {
+		try {
+			return _secretResolver.resolve(CompanyConstants.SYSTEM, value);
+		}
+		catch (SecretException secretException) {
+			return ReflectionUtil.throwException(secretException);
+		}
+	}
+
 	private static final String[] _PROPS_KEYS = {"sidecarJVMOptions"};
 
 	private volatile ElasticsearchConfiguration _elasticsearchConfiguration;
@@ -314,5 +327,8 @@ public class ElasticsearchConfigurationWrapper
 	private volatile ElasticsearchConfiguration
 		_propsElasticsearchConfiguration;
 	private volatile Map<String, Object> _propsMap = Collections.emptyMap();
+
+	@Reference
+	private SecretResolver _secretResolver;
 
 }

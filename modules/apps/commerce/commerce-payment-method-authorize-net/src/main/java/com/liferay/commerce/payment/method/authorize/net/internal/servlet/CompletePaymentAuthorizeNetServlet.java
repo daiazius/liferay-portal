@@ -13,6 +13,7 @@ import com.liferay.commerce.payment.method.authorize.net.internal.AuthorizeNetCo
 import com.liferay.commerce.payment.method.authorize.net.internal.configuration.AuthorizeNetGroupServiceConfiguration;
 import com.liferay.commerce.payment.method.authorize.net.internal.constants.AuthorizeNetCommercePaymentMethodConstants;
 import com.liferay.commerce.service.CommerceOrderLocalService;
+import com.liferay.petra.reflect.ReflectionUtil;
 import com.liferay.petra.string.CharPool;
 import com.liferay.portal.configuration.module.configuration.ConfigurationProvider;
 import com.liferay.portal.kernel.json.JSONException;
@@ -27,6 +28,8 @@ import com.liferay.portal.kernel.util.ParamUtil;
 import com.liferay.portal.kernel.util.Portal;
 import com.liferay.portal.kernel.util.StringUtil;
 import com.liferay.portal.kernel.util.Validator;
+import com.liferay.portal.security.key.secret.SecretResolver;
+import com.liferay.portal.security.key.secret.exception.SecretException;
 
 import jakarta.servlet.Servlet;
 import jakarta.servlet.ServletException;
@@ -211,7 +214,10 @@ public class CompletePaymentAuthorizeNetServlet extends HttpServlet {
 
 			if (!_isValidSignature(
 					bytes, httpServletRequest.getHeader("X-ANET-Signature"),
-					authorizeNetGroupServiceConfiguration.signatureKey())) {
+					_resolve(
+						commerceOrder.getCompanyId(),
+						authorizeNetGroupServiceConfiguration.
+							signatureKey()))) {
 
 				_log.error(
 					"Unable to verify the Authorize.net webhook signature");
@@ -286,6 +292,15 @@ public class CompletePaymentAuthorizeNetServlet extends HttpServlet {
 			headerSignature.getBytes(StandardCharsets.UTF_8));
 	}
 
+	private String _resolve(long companyId, String value) {
+		try {
+			return _secretResolver.resolve(companyId, value);
+		}
+		catch (SecretException secretException) {
+			return ReflectionUtil.throwException(secretException);
+		}
+	}
+
 	private static final Log _log = LogFactoryUtil.getLog(
 		CompletePaymentAuthorizeNetServlet.class);
 
@@ -306,5 +321,8 @@ public class CompletePaymentAuthorizeNetServlet extends HttpServlet {
 
 	@Reference
 	private Portal _portal;
+
+	@Reference
+	private SecretResolver _secretResolver;
 
 }
