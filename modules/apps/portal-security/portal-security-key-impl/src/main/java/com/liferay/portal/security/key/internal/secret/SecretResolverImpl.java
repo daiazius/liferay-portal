@@ -13,6 +13,8 @@ import com.liferay.portal.kernel.cache.PortalCache;
 import com.liferay.portal.kernel.cache.PortalCacheHelperUtil;
 import com.liferay.portal.kernel.cache.PortalCacheManagerNames;
 import com.liferay.portal.kernel.model.CompanyConstants;
+import com.liferay.portal.kernel.security.fips.FIPSAuditEvent;
+import com.liferay.portal.kernel.security.fips.FIPSAuditUtil;
 import com.liferay.portal.kernel.util.PropsValues;
 import com.liferay.portal.kernel.util.StringUtil;
 import com.liferay.portal.kernel.util.Validator;
@@ -115,48 +117,68 @@ public class SecretResolverImpl implements SecretResolver {
 		String identifier = StringBundler.concat(
 			namespace.getIdentifierPrefix(), scope, StringPool.SLASH, key);
 
-		try {
-			if (KeyReferenceUtil.isKeyReference(value)) {
-				KeyReference keyReference = KeyReferenceUtil.parseKeyReference(
-					value);
+		if (KeyReferenceUtil.isKeyReference(value)) {
+			KeyReference keyReference = KeyReferenceUtil.parseKeyReference(
+				value);
 
-				if (keyReference == null) {
-					throw new SecretException(
-						"Unable to parse the key reference");
-				}
+			if (keyReference == null) {
+				return ReflectionUtil.throwException(
+					new SecretException("Unable to parse the key reference"));
+			}
 
-				String referencedIdentifier = keyReference.getIdentifier();
+			String referencedIdentifier = keyReference.getIdentifier();
 
-				if (Objects.equals(identifier, referencedIdentifier) ||
-					((namespace == SecretNamespace.PREFERENCE) &&
-					 referencedIdentifier.startsWith(
-						 namespace.getIdentifierPrefix()) &&
-					 Objects.equals(
-						 key,
-						 StringUtil.extractLast(
-							 referencedIdentifier, CharPool.SLASH)))) {
+			if (Objects.equals(identifier, referencedIdentifier) ||
+				((namespace == SecretNamespace.PREFERENCE) &&
+				 referencedIdentifier.startsWith(
+					 namespace.getIdentifierPrefix()) &&
+				 Objects.equals(
+					 key,
+					 StringUtil.extractLast(
+						 referencedIdentifier, CharPool.SLASH)))) {
 
-					return value;
-				}
+				return value;
+			}
 
-				throw new SecretException(
+			FIPSAuditEvent fipsAuditEvent = new FIPSAuditEvent(
+				StringUtil.toLowerCase(namespace.name()) +
+					"-secret-reference-rejected",
+				FIPSAuditEvent.Severity.WARNING);
+
+			fipsAuditEvent.put("company-id", companyId);
+			fipsAuditEvent.put("identifier", identifier);
+			fipsAuditEvent.put("rejected-identifier", referencedIdentifier);
+
+			FIPSAuditUtil.write(fipsAuditEvent);
+
+			return ReflectionUtil.throwException(
+				new SecretException(
 					StringBundler.concat(
 						"Unable to store \"", key,
 						"\" because it references \"", referencedIdentifier,
-						"\""));
-			}
-
-			try (Secret secret = new Secret(
-					new KeyReference(
-						identifier, StringPool.STAR, KeyReference.Type.SECRET),
-					value)) {
-
-				return KeyReferenceUtil.toKeyReferenceString(
-					_secretManager.putSecret(companyId, secret));
-			}
+						"\"")));
 		}
-		catch (SecretException secretException) {
-			return ReflectionUtil.throwException(secretException);
+
+		try (Secret secret = new Secret(
+				new KeyReference(
+					identifier, StringPool.STAR, KeyReference.Type.SECRET),
+				value)) {
+
+			return KeyReferenceUtil.toKeyReferenceString(
+				_secretManager.putSecret(companyId, secret));
+		}
+		catch (Exception exception) {
+			FIPSAuditEvent fipsAuditEvent = new FIPSAuditEvent(
+				StringUtil.toLowerCase(namespace.name()) +
+					"-secret-store-failure",
+				FIPSAuditEvent.Severity.WARNING);
+
+			fipsAuditEvent.put("company-id", companyId);
+			fipsAuditEvent.put("identifier", identifier);
+
+			FIPSAuditUtil.write(fipsAuditEvent);
+
+			return ReflectionUtil.throwException(exception);
 		}
 	}
 

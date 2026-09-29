@@ -9,8 +9,11 @@ import com.liferay.petra.string.StringBundler;
 import com.liferay.petra.string.StringPool;
 import com.liferay.portal.kernel.cache.PortalCache;
 import com.liferay.portal.kernel.model.CompanyConstants;
+import com.liferay.portal.kernel.security.fips.FIPSAuditEvent;
+import com.liferay.portal.kernel.security.fips.FIPSAuditUtil;
 import com.liferay.portal.kernel.test.ReflectionTestUtil;
 import com.liferay.portal.kernel.test.util.RandomTestUtil;
+import com.liferay.portal.kernel.util.HashMapBuilder;
 import com.liferay.portal.kernel.util.PropsValues;
 import com.liferay.portal.security.key.KeyReference;
 import com.liferay.portal.security.key.KeyReferenceUtil;
@@ -30,7 +33,9 @@ import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
@@ -207,6 +212,10 @@ public class SecretResolverImplTest {
 
 			_testStoreWhenFIPSIsDisabled();
 			_testStoreWhenKeyReferenceIsInvalid();
+			_testStoreWhenSecretManagerFails();
+
+			Mockito.reset(_secretManager);
+
 			_testStoreWhenValueIsBlank();
 			_testStoreWhenValueReferencesAnotherKey();
 			_testStoreWhenValueReferencesAnotherNamespace();
@@ -278,11 +287,17 @@ public class SecretResolverImplTest {
 		String key = RandomTestUtil.randomString();
 		String scope = RandomTestUtil.randomString();
 
-		Assert.assertEquals(
-			KeyReferenceUtil.toKeyReferenceString(keyReference),
-			_secretResolverImpl.store(
-				companyId, key, namespace, scope,
-				RandomTestUtil.randomString()));
+		try (MockedStatic<FIPSAuditUtil> fipsAuditUtilMockedStatic =
+				Mockito.mockStatic(FIPSAuditUtil.class)) {
+
+			Assert.assertEquals(
+				KeyReferenceUtil.toKeyReferenceString(keyReference),
+				_secretResolverImpl.store(
+					companyId, key, namespace, scope,
+					RandomTestUtil.randomString()));
+
+			fipsAuditUtilMockedStatic.verifyNoInteractions();
+		}
 
 		Secret secret = atomicReference.get();
 
@@ -298,29 +313,111 @@ public class SecretResolverImplTest {
 		Assert.assertTrue(secret.isDestroyed());
 	}
 
+	private void _assertStoreFails(String eventType, SecretNamespace namespace)
+		throws Exception {
+
+		long companyId = RandomTestUtil.randomLong();
+		SecretException secretException = new SecretException();
+
+		Mockito.when(
+			_secretManager.putSecret(Mockito.eq(companyId), Mockito.any())
+		).thenThrow(
+			secretException
+		);
+
+		String key = RandomTestUtil.randomString();
+		String scope = RandomTestUtil.randomString();
+
+		try (MockedStatic<FIPSAuditUtil> fipsAuditUtilMockedStatic =
+				Mockito.mockStatic(FIPSAuditUtil.class)) {
+
+			Assert.assertSame(
+				secretException,
+				Assert.assertThrows(
+					SecretException.class,
+					() -> _secretResolverImpl.store(
+						companyId, key, namespace, scope,
+						RandomTestUtil.randomString())));
+
+			ArgumentCaptor<FIPSAuditEvent> argumentCaptor =
+				ArgumentCaptor.forClass(FIPSAuditEvent.class);
+
+			fipsAuditUtilMockedStatic.verify(
+				() -> FIPSAuditUtil.write(argumentCaptor.capture()));
+
+			FIPSAuditEvent fipsAuditEvent = argumentCaptor.getValue();
+
+			Assert.assertEquals(eventType, fipsAuditEvent.getEventType());
+			Assert.assertEquals(
+				HashMapBuilder.<String, Object>put(
+					"company-id", companyId
+				).put(
+					"identifier",
+					StringBundler.concat(
+						namespace.getIdentifierPrefix(), scope,
+						StringPool.SLASH, key)
+				).build(),
+				fipsAuditEvent.getFields());
+		}
+	}
+
 	private void _assertStoreKeepsValue(
-		String identifier, String key, SecretNamespace namespace,
+		String key, SecretNamespace namespace, String referencedIdentifier,
 		String scope) {
 
-		String value = _toKeyReferenceString(identifier);
+		String value = _toKeyReferenceString(referencedIdentifier);
 
-		Assert.assertEquals(
-			value,
-			_secretResolverImpl.store(
-				RandomTestUtil.randomLong(), key, namespace, scope, value));
+		try (MockedStatic<FIPSAuditUtil> fipsAuditUtilMockedStatic =
+				Mockito.mockStatic(FIPSAuditUtil.class)) {
+
+			Assert.assertEquals(
+				value,
+				_secretResolverImpl.store(
+					RandomTestUtil.randomLong(), key, namespace, scope, value));
+
+			fipsAuditUtilMockedStatic.verifyNoInteractions();
+		}
 
 		Mockito.verifyNoInteractions(_secretManager);
 	}
 
 	private void _assertStoreRejects(
-		String identifier, String key, SecretNamespace namespace,
-		String scope) {
+		String eventType, String key, SecretNamespace namespace,
+		String referencedIdentifier, String scope) {
 
-		Assert.assertThrows(
-			SecretException.class,
-			() -> _secretResolverImpl.store(
-				RandomTestUtil.randomLong(), key, namespace, scope,
-				_toKeyReferenceString(identifier)));
+		long companyId = RandomTestUtil.randomLong();
+
+		try (MockedStatic<FIPSAuditUtil> fipsAuditUtilMockedStatic =
+				Mockito.mockStatic(FIPSAuditUtil.class)) {
+
+			Assert.assertThrows(
+				SecretException.class,
+				() -> _secretResolverImpl.store(
+					companyId, key, namespace, scope,
+					_toKeyReferenceString(referencedIdentifier)));
+
+			ArgumentCaptor<FIPSAuditEvent> argumentCaptor =
+				ArgumentCaptor.forClass(FIPSAuditEvent.class);
+
+			fipsAuditUtilMockedStatic.verify(
+				() -> FIPSAuditUtil.write(argumentCaptor.capture()));
+
+			FIPSAuditEvent fipsAuditEvent = argumentCaptor.getValue();
+
+			Assert.assertEquals(eventType, fipsAuditEvent.getEventType());
+			Assert.assertEquals(
+				HashMapBuilder.<String, Object>put(
+					"company-id", companyId
+				).put(
+					"identifier",
+					StringBundler.concat(
+						namespace.getIdentifierPrefix(), scope,
+						StringPool.SLASH, key)
+				).put(
+					"rejected-identifier", referencedIdentifier
+				).build(),
+				fipsAuditEvent.getFields());
+		}
 
 		Mockito.verifyNoInteractions(_secretManager);
 	}
@@ -349,14 +446,28 @@ public class SecretResolverImplTest {
 	}
 
 	private void _testStoreWhenKeyReferenceIsInvalid() {
-		Assert.assertThrows(
-			SecretException.class,
-			() -> _secretResolverImpl.store(
-				RandomTestUtil.randomLong(), RandomTestUtil.randomString(),
-				SecretNamespace.CONFIGURATION, RandomTestUtil.randomString(),
-				"${secretRef:provider}"));
+		try (MockedStatic<FIPSAuditUtil> fipsAuditUtilMockedStatic =
+				Mockito.mockStatic(FIPSAuditUtil.class)) {
+
+			Assert.assertThrows(
+				SecretException.class,
+				() -> _secretResolverImpl.store(
+					RandomTestUtil.randomLong(), RandomTestUtil.randomString(),
+					SecretNamespace.CONFIGURATION,
+					RandomTestUtil.randomString(), "${secretRef:provider}"));
+
+			fipsAuditUtilMockedStatic.verifyNoInteractions();
+		}
 
 		Mockito.verifyNoInteractions(_secretManager);
+	}
+
+	private void _testStoreWhenSecretManagerFails() throws Exception {
+		_assertStoreFails(
+			"configuration-secret-store-failure",
+			SecretNamespace.CONFIGURATION);
+		_assertStoreFails(
+			"preference-secret-store-failure", SecretNamespace.PREFERENCE);
 	}
 
 	private void _testStoreWhenValueIsBlank() {
@@ -375,15 +486,19 @@ public class SecretResolverImplTest {
 		String scope = RandomTestUtil.randomString();
 
 		_assertStoreRejects(
+			"configuration-secret-reference-rejected", key,
+			SecretNamespace.CONFIGURATION,
 			StringBundler.concat(
 				"config/", scope, StringPool.SLASH,
 				RandomTestUtil.randomString()),
-			key, SecretNamespace.CONFIGURATION, scope);
+			scope);
 		_assertStoreRejects(
+			"preference-secret-reference-rejected", key,
+			SecretNamespace.PREFERENCE,
 			StringBundler.concat(
 				"preference/", scope, StringPool.SLASH,
 				RandomTestUtil.randomString()),
-			key, SecretNamespace.PREFERENCE, scope);
+			scope);
 	}
 
 	private void _testStoreWhenValueReferencesAnotherNamespace() {
@@ -391,26 +506,33 @@ public class SecretResolverImplTest {
 		String scope = RandomTestUtil.randomString();
 
 		_assertStoreRejects(
+			"configuration-secret-reference-rejected", key,
+			SecretNamespace.CONFIGURATION,
 			StringBundler.concat("preference/", scope, StringPool.SLASH, key),
-			key, SecretNamespace.CONFIGURATION, scope);
+			scope);
 		_assertStoreRejects(
-			StringBundler.concat("config/", scope, StringPool.SLASH, key), key,
-			SecretNamespace.PREFERENCE, scope);
+			"preference-secret-reference-rejected", key,
+			SecretNamespace.PREFERENCE,
+			StringBundler.concat("config/", scope, StringPool.SLASH, key),
+			scope);
 	}
 
 	private void _testStoreWhenValueReferencesSameKeyInAnotherScope() {
 		String key = RandomTestUtil.randomString();
 
 		_assertStoreRejects(
+			"configuration-secret-reference-rejected", key,
+			SecretNamespace.CONFIGURATION,
 			StringBundler.concat(
 				"config/", RandomTestUtil.randomString(), StringPool.SLASH,
 				key),
-			key, SecretNamespace.CONFIGURATION, RandomTestUtil.randomString());
+			RandomTestUtil.randomString());
 		_assertStoreKeepsValue(
+			key, SecretNamespace.PREFERENCE,
 			StringBundler.concat(
 				"preference/", RandomTestUtil.randomString(), StringPool.SLASH,
 				key),
-			key, SecretNamespace.PREFERENCE, RandomTestUtil.randomString());
+			RandomTestUtil.randomString());
 	}
 
 	private void _testStoreWhenValueReferencesSameSlot() {
@@ -418,11 +540,13 @@ public class SecretResolverImplTest {
 		String scope = RandomTestUtil.randomString();
 
 		_assertStoreKeepsValue(
-			StringBundler.concat("config/", scope, StringPool.SLASH, key), key,
-			SecretNamespace.CONFIGURATION, scope);
+			key, SecretNamespace.CONFIGURATION,
+			StringBundler.concat("config/", scope, StringPool.SLASH, key),
+			scope);
 		_assertStoreKeepsValue(
+			key, SecretNamespace.PREFERENCE,
 			StringBundler.concat("preference/", scope, StringPool.SLASH, key),
-			key, SecretNamespace.PREFERENCE, scope);
+			scope);
 	}
 
 	private String _toKeyReferenceString(String identifier) {
