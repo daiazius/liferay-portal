@@ -19,6 +19,7 @@ import com.liferay.portal.kernel.util.ParamUtil;
 import com.liferay.portal.kernel.util.StringUtil;
 import com.liferay.portal.kernel.util.Validator;
 import com.liferay.portal.kernel.util.WebKeys;
+import com.liferay.portal.security.key.secret.SecretNamespace;
 import com.liferay.portal.security.key.secret.SecretResolver;
 
 import jakarta.portlet.ActionRequest;
@@ -121,7 +122,7 @@ public class IFrameConfigurationAction extends DefaultConfigurationAction {
 		String value = portletPreferences.getValue(name, StringPool.BLANK);
 
 		String storedValue = _secretResolver.store(
-			companyId, name,
+			companyId, name, SecretNamespace.PREFERENCE,
 			StringBundler.concat(
 				"portlet/", themeDisplay.getPlid(), StringPool.SLASH,
 				ParamUtil.getString(portletRequest, "portletResource")),

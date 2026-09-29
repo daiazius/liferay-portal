@@ -16,6 +16,7 @@ import com.liferay.portal.security.key.KeyReference;
 import com.liferay.portal.security.key.KeyReferenceUtil;
 import com.liferay.portal.security.key.secret.Secret;
 import com.liferay.portal.security.key.secret.SecretManager;
+import com.liferay.portal.security.key.secret.SecretNamespace;
 import com.liferay.portal.security.key.secret.exception.SecretException;
 import com.liferay.portal.security.key.spi.profile.KeyManagerProfile;
 import com.liferay.portal.security.key.spi.profile.KeyManagerProfileRegistry;
@@ -201,10 +202,14 @@ public class SecretResolverImplTest {
 					PropsValues.class, "FIPS_ENABLED", true)) {
 
 			_testStore();
+
+			Mockito.clearInvocations(_secretManager);
+
 			_testStoreWhenFIPSIsDisabled();
+			_testStoreWhenKeyReferenceIsInvalid();
 			_testStoreWhenValueIsBlank();
 			_testStoreWhenValueReferencesAnotherKey();
-			_testStoreWhenValueReferencesForeignNamespace();
+			_testStoreWhenValueReferencesAnotherNamespace();
 			_testStoreWhenValueReferencesSameKeyInAnotherScope();
 			_testStoreWhenValueReferencesSameSlot();
 		}
@@ -248,7 +253,10 @@ public class SecretResolverImplTest {
 		);
 	}
 
-	private void _testStore() throws Exception {
+	private void _assertStore(
+			String identifierPrefix, SecretNamespace namespace)
+		throws Exception {
+
 		long companyId = RandomTestUtil.randomLong();
 
 		KeyReference keyReference = new KeyReference(
@@ -273,21 +281,53 @@ public class SecretResolverImplTest {
 		Assert.assertEquals(
 			KeyReferenceUtil.toKeyReferenceString(keyReference),
 			_secretResolverImpl.store(
-				companyId, key, scope, RandomTestUtil.randomString()));
+				companyId, key, namespace, scope,
+				RandomTestUtil.randomString()));
 
 		Secret secret = atomicReference.get();
 
 		KeyReference secretKeyReference = secret.getKeyReference();
 
 		Assert.assertEquals(
-			StringBundler.concat("preference/", scope, StringPool.SLASH, key),
+			StringBundler.concat(
+				identifierPrefix, scope, StringPool.SLASH, key),
 			secretKeyReference.getIdentifier());
 		Assert.assertEquals(
 			StringPool.STAR, secretKeyReference.getProviderId());
 
 		Assert.assertTrue(secret.isDestroyed());
+	}
 
-		Mockito.clearInvocations(_secretManager);
+	private void _assertStoreKeepsValue(
+		String identifier, String key, SecretNamespace namespace,
+		String scope) {
+
+		String value = _toKeyReferenceString(identifier);
+
+		Assert.assertEquals(
+			value,
+			_secretResolverImpl.store(
+				RandomTestUtil.randomLong(), key, namespace, scope, value));
+
+		Mockito.verifyNoInteractions(_secretManager);
+	}
+
+	private void _assertStoreRejects(
+		String identifier, String key, SecretNamespace namespace,
+		String scope) {
+
+		Assert.assertThrows(
+			SecretException.class,
+			() -> _secretResolverImpl.store(
+				RandomTestUtil.randomLong(), key, namespace, scope,
+				_toKeyReferenceString(identifier)));
+
+		Mockito.verifyNoInteractions(_secretManager);
+	}
+
+	private void _testStore() throws Exception {
+		_assertStore("config/", SecretNamespace.CONFIGURATION);
+		_assertStore("preference/", SecretNamespace.PREFERENCE);
 	}
 
 	private void _testStoreWhenFIPSIsDisabled() throws Exception {
@@ -301,87 +341,88 @@ public class SecretResolverImplTest {
 				value,
 				_secretResolverImpl.store(
 					RandomTestUtil.randomLong(), RandomTestUtil.randomString(),
-					RandomTestUtil.randomString(), value));
+					SecretNamespace.PREFERENCE, RandomTestUtil.randomString(),
+					value));
 
 			Mockito.verifyNoInteractions(_secretManager);
 		}
 	}
 
-	private void _testStoreWhenValueIsBlank() throws Exception {
+	private void _testStoreWhenKeyReferenceIsInvalid() {
+		Assert.assertThrows(
+			SecretException.class,
+			() -> _secretResolverImpl.store(
+				RandomTestUtil.randomLong(), RandomTestUtil.randomString(),
+				SecretNamespace.CONFIGURATION, RandomTestUtil.randomString(),
+				"${secretRef:provider}"));
+
+		Mockito.verifyNoInteractions(_secretManager);
+	}
+
+	private void _testStoreWhenValueIsBlank() {
 		Assert.assertEquals(
 			StringPool.BLANK,
 			_secretResolverImpl.store(
 				RandomTestUtil.randomLong(), RandomTestUtil.randomString(),
-				RandomTestUtil.randomString(), StringPool.BLANK));
+				SecretNamespace.PREFERENCE, RandomTestUtil.randomString(),
+				StringPool.BLANK));
 
 		Mockito.verifyNoInteractions(_secretManager);
 	}
 
-	private void _testStoreWhenValueReferencesAnotherKey() throws Exception {
-		String value = _toKeyReferenceString(
-			StringBundler.concat(
-				"preference/", RandomTestUtil.randomString(), StringPool.SLASH,
-				RandomTestUtil.randomString()));
-
-		Assert.assertThrows(
-			SecretException.class,
-			() -> _secretResolverImpl.store(
-				RandomTestUtil.randomLong(), RandomTestUtil.randomString(),
-				RandomTestUtil.randomString(), value));
-
-		Mockito.verifyNoInteractions(_secretManager);
-	}
-
-	private void _testStoreWhenValueReferencesForeignNamespace()
-		throws Exception {
-
-		String key = RandomTestUtil.randomString();
-
-		String value = _toKeyReferenceString(
-			StringBundler.concat(
-				RandomTestUtil.randomString(), StringPool.SLASH, key));
-
-		Assert.assertThrows(
-			SecretException.class,
-			() -> _secretResolverImpl.store(
-				RandomTestUtil.randomLong(), key, RandomTestUtil.randomString(),
-				value));
-
-		Mockito.verifyNoInteractions(_secretManager);
-	}
-
-	private void _testStoreWhenValueReferencesSameKeyInAnotherScope()
-		throws Exception {
-
-		String key = RandomTestUtil.randomString();
-
-		String value = _toKeyReferenceString(
-			StringBundler.concat(
-				"preference/", RandomTestUtil.randomString(), StringPool.SLASH,
-				key));
-
-		Assert.assertEquals(
-			value,
-			_secretResolverImpl.store(
-				RandomTestUtil.randomLong(), key, RandomTestUtil.randomString(),
-				value));
-
-		Mockito.verifyNoInteractions(_secretManager);
-	}
-
-	private void _testStoreWhenValueReferencesSameSlot() throws Exception {
+	private void _testStoreWhenValueReferencesAnotherKey() {
 		String key = RandomTestUtil.randomString();
 		String scope = RandomTestUtil.randomString();
 
-		String value = _toKeyReferenceString(
-			StringBundler.concat("preference/", scope, StringPool.SLASH, key));
+		_assertStoreRejects(
+			StringBundler.concat(
+				"config/", scope, StringPool.SLASH,
+				RandomTestUtil.randomString()),
+			key, SecretNamespace.CONFIGURATION, scope);
+		_assertStoreRejects(
+			StringBundler.concat(
+				"preference/", scope, StringPool.SLASH,
+				RandomTestUtil.randomString()),
+			key, SecretNamespace.PREFERENCE, scope);
+	}
 
-		Assert.assertEquals(
-			value,
-			_secretResolverImpl.store(
-				RandomTestUtil.randomLong(), key, scope, value));
+	private void _testStoreWhenValueReferencesAnotherNamespace() {
+		String key = RandomTestUtil.randomString();
+		String scope = RandomTestUtil.randomString();
 
-		Mockito.verifyNoInteractions(_secretManager);
+		_assertStoreRejects(
+			StringBundler.concat("preference/", scope, StringPool.SLASH, key),
+			key, SecretNamespace.CONFIGURATION, scope);
+		_assertStoreRejects(
+			StringBundler.concat("config/", scope, StringPool.SLASH, key), key,
+			SecretNamespace.PREFERENCE, scope);
+	}
+
+	private void _testStoreWhenValueReferencesSameKeyInAnotherScope() {
+		String key = RandomTestUtil.randomString();
+
+		_assertStoreRejects(
+			StringBundler.concat(
+				"config/", RandomTestUtil.randomString(), StringPool.SLASH,
+				key),
+			key, SecretNamespace.CONFIGURATION, RandomTestUtil.randomString());
+		_assertStoreKeepsValue(
+			StringBundler.concat(
+				"preference/", RandomTestUtil.randomString(), StringPool.SLASH,
+				key),
+			key, SecretNamespace.PREFERENCE, RandomTestUtil.randomString());
+	}
+
+	private void _testStoreWhenValueReferencesSameSlot() {
+		String key = RandomTestUtil.randomString();
+		String scope = RandomTestUtil.randomString();
+
+		_assertStoreKeepsValue(
+			StringBundler.concat("config/", scope, StringPool.SLASH, key), key,
+			SecretNamespace.CONFIGURATION, scope);
+		_assertStoreKeepsValue(
+			StringBundler.concat("preference/", scope, StringPool.SLASH, key),
+			key, SecretNamespace.PREFERENCE, scope);
 	}
 
 	private String _toKeyReferenceString(String identifier) {

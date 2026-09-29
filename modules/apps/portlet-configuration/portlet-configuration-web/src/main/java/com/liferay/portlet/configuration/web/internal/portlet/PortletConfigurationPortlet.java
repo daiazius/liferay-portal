@@ -72,6 +72,7 @@ import com.liferay.portal.kernel.util.Tuple;
 import com.liferay.portal.kernel.util.Validator;
 import com.liferay.portal.kernel.util.WebKeys;
 import com.liferay.portal.kernel.workflow.WorkflowConstants;
+import com.liferay.portal.security.key.secret.SecretNamespace;
 import com.liferay.portal.security.key.secret.SecretResolver;
 import com.liferay.portlet.configuration.kernel.util.PortletConfigurationUtil;
 import com.liferay.portlet.configuration.web.internal.constants.PortletConfigurationPortletKeys;
@@ -1017,6 +1018,7 @@ public class PortletConfigurationPortlet extends MVCPortlet {
 			"lfrFacebookApiKey",
 			_secretResolver.store(
 				themeDisplay.getCompanyId(), "lfrFacebookApiKey",
+				SecretNamespace.PREFERENCE,
 				StringBundler.concat(
 					"portlet/", themeDisplay.getPlid(), StringPool.SLASH,
 					ParamUtil.getString(actionRequest, "portletResource")),

@@ -66,6 +66,7 @@ import com.liferay.portal.kernel.util.StringUtil;
 import com.liferay.portal.kernel.util.UnicodeProperties;
 import com.liferay.portal.kernel.util.Validator;
 import com.liferay.portal.kernel.util.WebKeys;
+import com.liferay.portal.security.key.secret.SecretNamespace;
 import com.liferay.portal.security.key.secret.SecretResolver;
 import com.liferay.portal.settings.web.internal.exception.RequiredLocaleException;
 import com.liferay.portlet.usersadmin.util.UsersAdminUtil;
@@ -184,8 +185,8 @@ public class EditCompanyMVCActionCommand extends BaseFormMVCActionCommand {
 		unicodeProperties.setProperty(
 			key,
 			_secretResolver.store(
-				companyId, key, "company/" + companyId,
-				unicodeProperties.getProperty(key)));
+				companyId, key, SecretNamespace.PREFERENCE,
+				"company/" + companyId, unicodeProperties.getProperty(key)));
 	}
 
 	private void _updateCompany(ActionRequest actionRequest) throws Exception {
