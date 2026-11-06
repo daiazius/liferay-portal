@@ -61,6 +61,36 @@ public class SamlHttpRequestHelperImplTest extends BaseSamlTestCase {
 	}
 
 	@Test
+	public void testGetRequestPathWithDotSegment() {
+		MockHttpServletRequest mockHttpServletRequest =
+			new MockHttpServletRequest(HttpMethods.GET, "/c/portal/./login");
+
+		Assert.assertEquals(
+			"/c/portal/login",
+			_samlHttpRequestHelperImpl.getRequestPath(mockHttpServletRequest));
+	}
+
+	@Test
+	public void testGetRequestPathWithDoubleSlash() {
+		MockHttpServletRequest mockHttpServletRequest =
+			new MockHttpServletRequest(HttpMethods.GET, "//c/portal/login");
+
+		Assert.assertEquals(
+			"/c/portal/login",
+			_samlHttpRequestHelperImpl.getRequestPath(mockHttpServletRequest));
+	}
+
+	@Test
+	public void testGetRequestPathWithTrailingSlash() {
+		MockHttpServletRequest mockHttpServletRequest =
+			new MockHttpServletRequest(HttpMethods.GET, "/c/portal/login/");
+
+		Assert.assertEquals(
+			"/c/portal/login",
+			_samlHttpRequestHelperImpl.getRequestPath(mockHttpServletRequest));
+	}
+
+	@Test
 	public void testGetRequestPathWithoutJsessionId() {
 		MockHttpServletRequest mockHttpServletRequest =
 			new MockHttpServletRequest(HttpMethods.GET, "/c/portal/login");

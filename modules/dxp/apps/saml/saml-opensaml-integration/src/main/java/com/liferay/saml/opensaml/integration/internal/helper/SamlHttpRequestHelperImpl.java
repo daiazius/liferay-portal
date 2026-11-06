@@ -56,7 +56,15 @@ public class SamlHttpRequestHelperImpl implements SamlHttpRequestHelper {
 			requestURI = requestURI.substring(contextPath.length());
 		}
 
-		return HttpComponentsUtil.removePathParameters(requestURI);
+		requestURI = HttpComponentsUtil.normalizePath(requestURI);
+
+		if ((requestURI.length() > 1) &&
+			requestURI.endsWith(StringPool.SLASH)) {
+
+			requestURI = requestURI.substring(0, requestURI.length() - 1);
+		}
+
+		return requestURI;
 	}
 
 	@Reference
