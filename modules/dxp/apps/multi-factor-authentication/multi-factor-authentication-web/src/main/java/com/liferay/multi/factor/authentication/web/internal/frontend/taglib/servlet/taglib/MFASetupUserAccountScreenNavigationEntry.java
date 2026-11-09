@@ -9,6 +9,7 @@ import com.liferay.frontend.taglib.servlet.taglib.ScreenNavigationEntry;
 import com.liferay.multi.factor.authentication.spi.checker.setup.SetupMFAChecker;
 import com.liferay.multi.factor.authentication.web.internal.constants.MFASetupUserAccountScreenNavigationConstants;
 import com.liferay.multi.factor.authentication.web.internal.constants.MFAWebKeys;
+import com.liferay.multi.factor.authentication.web.internal.policy.MFAPolicy;
 import com.liferay.portal.kernel.model.User;
 import com.liferay.portal.kernel.resource.bundle.ResourceBundleLoader;
 import com.liferay.portal.kernel.resource.bundle.ResourceBundleLoaderUtil;
@@ -38,11 +39,13 @@ public class MFASetupUserAccountScreenNavigationEntry
 
 	public MFASetupUserAccountScreenNavigationEntry(
 		ServiceReference<Object> serviceReference,
-		ServletContext servletContext, SetupMFAChecker setupMFAChecker) {
+		ServletContext servletContext, SetupMFAChecker setupMFAChecker,
+		MFAPolicy mfaPolicy) {
 
 		_serviceReference = serviceReference;
 		_servletContext = servletContext;
 		_setupMFAChecker = setupMFAChecker;
+		_mfaPolicy = mfaPolicy;
 
 		_bundle = serviceReference.getBundle();
 		_companyId = GetterUtil.getLong(
@@ -91,7 +94,9 @@ public class MFASetupUserAccountScreenNavigationEntry
 
 	@Override
 	public boolean isVisible(User user, User context) {
-		if (_companyId == CompanyThreadLocal.getCompanyId()) {
+		if ((_companyId == CompanyThreadLocal.getCompanyId()) &&
+			_mfaPolicy.isMFAEnabled(_companyId)) {
+
 			return true;
 		}
 
@@ -129,6 +134,7 @@ public class MFASetupUserAccountScreenNavigationEntry
 
 	private final Bundle _bundle;
 	private final long _companyId;
+	private final MFAPolicy _mfaPolicy;
 	private final String _resourceBundleKey;
 	private final ServiceReference<Object> _serviceReference;
 	private final ServletContext _servletContext;

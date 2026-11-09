@@ -64,6 +64,16 @@ public class ViewMVCRenderCommand implements MVCRenderCommand {
 			_mfaPolicy.getAvailableBrowserMFACheckers(
 				_portal.getCompanyId(renderRequest), mfaUserId);
 
+		if (browserMFACheckers.isEmpty()) {
+			SessionErrors.add(renderRequest, "noAvailableBrowserMFAChecker");
+
+			renderRequest.setAttribute(
+				MFAWebKeys.BROWSER_MFA_CHECKERS, browserMFACheckers);
+			renderRequest.setAttribute(MFAWebKeys.MFA_USER_ID, mfaUserId);
+
+			return "/mfa_verify/view.jsp";
+		}
+
 		int mfaCheckerIndex = ParamUtil.getInteger(
 			renderRequest, "mfaCheckerIndex");
 
