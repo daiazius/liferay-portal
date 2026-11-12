@@ -41,20 +41,6 @@ public class MFABrowserVerificationHelper {
 			WindowState windowState)
 		throws Exception {
 
-		Key key = _encryptor.generateKey();
-
-		String encryptedStateMapJSON = _encryptor.encrypt(
-			key,
-			_jsonFactory.looseSerializeDeep(
-				HashMapBuilder.<String, Object>put(
-					"requestParameters",
-					() -> HashMapBuilder.putAll(
-						parameterMap
-					).remove(
-						"redirect"
-					).build()
-				).build()));
-
 		ThemeDisplay themeDisplay =
 			(ThemeDisplay)httpServletRequest.getAttribute(
 				WebKeys.THEME_DISPLAY);
@@ -70,7 +56,23 @@ public class MFABrowserVerificationHelper {
 		liferayPortletURL.setParameter("redirect", redirect);
 		liferayPortletURL.setParameter(
 			"saveLastPath", Boolean.FALSE.toString());
+
+		Key key = _encryptor.generateKey();
+
+		String encryptedStateMapJSON = _encryptor.encrypt(
+			key,
+			_jsonFactory.looseSerializeDeep(
+				HashMapBuilder.<String, Object>put(
+					"requestParameters",
+					() -> HashMapBuilder.putAll(
+						parameterMap
+					).remove(
+						"redirect"
+					).build()
+				).build()));
+
 		liferayPortletURL.setParameter("state", encryptedStateMapJSON);
+
 		liferayPortletURL.setWindowState(windowState);
 
 		HttpSession httpSession = httpServletRequest.getSession();
